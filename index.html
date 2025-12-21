@@ -1,0 +1,653 @@
+import React, { useState, useEffect, useRef, useMemo } from 'react';
+import { Camera, Plus, User, PieChart, Calendar, TrendingUp, ScanLine, X, Save, ChevronLeft, ChevronRight, Loader2, Scale, CheckCircle2, AlertCircle } from 'lucide-react';
+import { initializeApp } from 'firebase/app';
+import { getAuth, signInAnonymously, onAuthStateChanged, signInWithCustomToken } from 'firebase/auth';
+import { getFirestore, collection, addDoc, query, onSnapshot, deleteDoc, doc, setDoc, getDoc, orderBy, limit, where } from 'firebase/firestore';
+import { LineChart, Line, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer, AreaChart, Area } from 'recharts';
+
+// --- CONFIGURAZIONE FIREBASE ---
+const firebaseConfig = JSON.parse(__firebase_config);
+const app = initializeApp(firebaseConfig);
+const auth = getAuth(app);
+const db = getFirestore(app);
+const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
+const apiKey = ""; // API Key Gemini
+
+// --- UTILS & API ---
+async function callGemini(prompt, imageBase64 = null, jsonMode = true) {
+  const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=${apiKey}`;
+  const contents = [{
+    role: "user",
+    parts: [{ text: prompt }, imageBase64 ? { inlineData: { mimeType: "image/jpeg", data: imageBase64 } } : null].filter(Boolean)
+  }];
+
+  try {
+    const response = await fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        contents,
+        generationConfig: jsonMode ? { responseMimeType: "application/json" } : {}
+      })
+    });
+    if (!response.ok) throw new Error("Errore API Gemini");
+    const data = await response.json();
+    const text = data.candidates?.[0]?.content?.parts?.[0]?.text;
+    return jsonMode ? JSON.parse(text) : text;
+  } catch (error) {
+    console.error("Errore Gemini:", error);
+    return null;
+  }
+}
+
+// --- APP COMPONENT ---
+export default function NutriAIPro() {
+  const [user, setUser] = useState(null);
+  const [activeTab, setActiveTab] = useState('daily');
+  const [profile, setProfile] = useState({ name: '', age: '', weight: '', height: '', goal: 'Mantenimento', gender: 'Uomo' });
+
+  // Init Auth
+  useEffect(() => {
+    const init = async () => {
+        if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
+            await signInWithCustomToken(auth, __initial_auth_token);
+        } else {
+            await signInAnonymously(auth);
+        }
+    };
+    init();
+    return onAuthStateChanged(auth, setUser);
+  }, []);
+
+  // Load Profile
+  useEffect(() => {
+    if (!user) return;
+    const loadProfile = async () => {
+      const snap = await getDoc(doc(db, 'artifacts', appId, 'users', user.uid, 'profile', 'main'));
+      if (snap.exists()) setProfile(snap.data());
+    };
+    loadProfile();
+  }, [user]);
+
+  if (!user) return <div className="h-screen flex items-center justify-center bg-gray-50"><Loader2 className="animate-spin text-emerald-600" size={40} /></div>;
+
+  return (
+    <div className="bg-gray-50 min-h-screen font-sans text-gray-800 pb-24 md:max-w-md md:mx-auto md:shadow-2xl md:min-h-screen md:border-x border-gray-200">
+      {/* Dynamic Content */}
+      <div className="animate-in fade-in duration-300">
+        {activeTab === 'daily' && <DailyView user={user} profile={profile} setActiveTab={setActiveTab} />}
+        {activeTab === 'planner' && <WeeklyPlanner user={user} profile={profile} />}
+        {activeTab === 'trends' && <TrendsAnalytics user={user} profile={profile} />}
+        {activeTab === 'add' && <AddFood user={user} profile={profile} close={() => setActiveTab('daily')} />}
+        {activeTab === 'profile' && <UserProfile user={user} profile={profile} setProfile={setProfile} />}
+      </div>
+
+      {/* Bottom Navigation Bar */}
+      <div className="fixed bottom-0 left-0 right-0 md:w-full md:max-w-md md:mx-auto bg-white border-t border-gray-200 px-6 py-3 flex justify-between items-end z-50 pb-safe shadow-lg-up">
+        <NavBtn icon={<PieChart size={22} />} label="Oggi" active={activeTab === 'daily'} onClick={() => setActiveTab('daily')} />
+        <NavBtn icon={<Calendar size={22} />} label="Piano" active={activeTab === 'planner'} onClick={() => setActiveTab('planner')} />
+        <div className="relative -top-6">
+          <button onClick={() => setActiveTab('add')} className="bg-emerald-600 text-white p-4 rounded-full shadow-xl hover:scale-105 transition-transform">
+            <Plus size={28} />
+          </button>
+        </div>
+        <NavBtn icon={<TrendingUp size={22} />} label="Analisi" active={activeTab === 'trends'} onClick={() => setActiveTab('trends')} />
+        <NavBtn icon={<User size={22} />} label="Tu" active={activeTab === 'profile'} onClick={() => setActiveTab('profile')} />
+      </div>
+    </div>
+  );
+}
+
+const NavBtn = ({ icon, label, active, onClick }) => (
+  <button onClick={onClick} className={`flex flex-col items-center gap-1 ${active ? 'text-emerald-600 font-medium' : 'text-gray-400'}`}>
+    {icon}
+    <span className="text-[10px] uppercase tracking-wide">{label}</span>
+  </button>
+);
+
+// --- 1. DAILY VIEW (DASHBOARD) ---
+function DailyView({ user, profile, setActiveTab }) {
+  const [logs, setLogs] = useState([]);
+  const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
+  
+  // Calcolo Target Calorico Semplificato
+  const bmr = profile.weight ? (10 * profile.weight) + (6.25 * profile.height) - (5 * profile.age) + (profile.gender === 'Uomo' ? 5 : -161) : 2000;
+  const targetCals = Math.round(bmr * (profile.goal === 'Dimagrimento' ? 1.1 : profile.goal === 'Aumento Massa' ? 1.4 : 1.2));
+
+  useEffect(() => {
+    const q = query(collection(db, 'artifacts', appId, 'users', user.uid, 'food_logs'), where("date", "==", date));
+    return onSnapshot(q, (snap) => setLogs(snap.docs.map(d => ({ id: d.id, ...d.data() }))));
+  }, [user, date]);
+
+  const stats = logs.reduce((acc, l) => ({
+    cals: acc.cals + (l.calories || 0),
+    prot: acc.prot + (l.protein || 0),
+    carb: acc.carb + (l.carbs || 0),
+    fat: acc.fat + (l.fat || 0)
+  }), { cals: 0, prot: 0, carb: 0, fat: 0 });
+
+  return (
+    <div className="p-5 space-y-6">
+      <header className="flex justify-between items-center pt-2">
+        <div>
+          <h1 className="text-2xl font-bold text-gray-900">Oggi</h1>
+          <p className="text-gray-500 text-sm">{new Date(date).toLocaleDateString('it-IT', { weekday: 'long', day: 'numeric', month: 'long' })}</p>
+        </div>
+        <input type="date" value={date} onChange={e => setDate(e.target.value)} className="bg-white border rounded-lg p-2 text-sm" />
+      </header>
+
+      {/* Main Stats Card */}
+      <div className="bg-white rounded-3xl p-6 shadow-sm border border-gray-100 relative overflow-hidden">
+        <div className="absolute top-0 right-0 w-32 h-32 bg-emerald-50 rounded-full -mr-10 -mt-10 opacity-50 pointer-events-none"></div>
+        <div className="flex justify-between items-end mb-4 relative z-10">
+          <div>
+            <span className="text-gray-400 text-xs font-bold tracking-wider uppercase">Calorie</span>
+            <div className="text-4xl font-bold text-gray-900">{stats.cals}</div>
+            <span className="text-emerald-600 text-sm font-medium">di {targetCals} kcal</span>
+          </div>
+          <div className="h-16 w-16 relative">
+            <svg viewBox="0 0 36 36" className="w-full h-full transform -rotate-90">
+              <path d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" fill="none" stroke="#eee" strokeWidth="4" />
+              <path d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" fill="none" stroke="#10b981" strokeWidth="4" strokeDasharray={`${Math.min((stats.cals/targetCals)*100, 100)}, 100`} />
+            </svg>
+          </div>
+        </div>
+        
+        <div className="grid grid-cols-3 gap-2 mt-4 relative z-10">
+          <MacroPill label="Prot" val={stats.prot} total={150} color="bg-blue-500" />
+          <MacroPill label="Carb" val={stats.carb} total={250} color="bg-amber-500" />
+          <MacroPill label="Grassi" val={stats.fat} total={70} color="bg-rose-500" />
+        </div>
+      </div>
+
+      {/* Meals Feed */}
+      <div>
+        <h2 className="font-bold text-gray-800 mb-3 text-lg">Pasti registrati</h2>
+        {logs.length === 0 ? (
+          <div onClick={() => setActiveTab('add')} className="border-2 border-dashed border-gray-300 rounded-2xl p-8 text-center text-gray-400 cursor-pointer hover:bg-gray-50 transition-colors">
+            <Plus className="mx-auto mb-2" />
+            <p>Non hai ancora mangiato? <br/>Tocca per aggiungere.</p>
+          </div>
+        ) : (
+          <div className="space-y-3">
+            {logs.map(log => (
+              <div key={log.id} className="bg-white p-4 rounded-2xl shadow-sm border border-gray-100 flex justify-between items-center group">
+                <div>
+                  <div className="font-bold text-gray-800 capitalize">{log.name}</div>
+                  <div className="text-xs text-gray-500 mt-1 flex gap-3">
+                    <span className="font-medium text-emerald-600">{log.calories} kcal</span>
+                    <span>P: {log.protein}</span>
+                    <span>C: {log.carbs}</span>
+                    <span>G: {log.fat}</span>
+                  </div>
+                </div>
+                <button onClick={() => deleteDoc(doc(db, 'artifacts', appId, 'users', user.uid, 'food_logs', log.id))} className="p-2 text-gray-300 hover:text-red-500 transition-colors">
+                  <X size={18} />
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+const MacroPill = ({ label, val, total, color }) => (
+  <div className="bg-gray-50 rounded-xl p-3 flex flex-col justify-between">
+    <span className="text-xs text-gray-500 font-medium">{label}</span>
+    <div className="mt-2">
+      <div className="text-sm font-bold text-gray-800">{Math.round(val)}g</div>
+      <div className="w-full bg-gray-200 h-1.5 rounded-full mt-1 overflow-hidden">
+        <div className={`h-full ${color}`} style={{ width: `${Math.min((val/total)*100, 100)}%` }}></div>
+      </div>
+    </div>
+  </div>
+);
+
+// --- 2. WEEKLY PLANNER (ENHANCED AI WITH FORM) ---
+function WeeklyPlanner({ user, profile }) {
+  const [weekPlan, setWeekPlan] = useState(null);
+  const [showWizard, setShowWizard] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [selectedDay, setSelectedDay] = useState('lunedì');
+  const days = ['lunedì', 'martedì', 'mercoledì', 'giovedì', 'venerdì', 'sabato', 'domenica'];
+
+  // Wizard State
+  const [assessment, setAssessment] = useState({
+    activityLevel: 'Sedentario',
+    dietType: 'Onnivoro',
+    allergies: '',
+    mealsPerDay: '3',
+    conditions: ''
+  });
+
+  useEffect(() => {
+    // Check for existing plan
+    getDoc(doc(db, 'artifacts', appId, 'users', user.uid, 'plans', 'current_week')).then(s => {
+      if(s.exists()) setWeekPlan(s.data());
+    });
+    // Check for last assessment data to autofill
+    getDoc(doc(db, 'artifacts', appId, 'users', user.uid, 'profile', 'assessment')).then(s => {
+      if(s.exists()) setAssessment(s.data());
+    });
+  }, [user]);
+
+  const generateWeek = async () => {
+    setLoading(true);
+    // Save assessment for future use
+    await setDoc(doc(db, 'artifacts', appId, 'users', user.uid, 'profile', 'assessment'), assessment);
+
+    const prompt = `
+      Crea un piano alimentare settimanale dettagliato (7 giorni) altamente personalizzato.
+      
+      PROFILO UTENTE:
+      - Dati fisici: ${JSON.stringify(profile)}
+      - Livello Attività: ${assessment.activityLevel}
+      - Tipo Dieta: ${assessment.dietType}
+      - Allergie/Intolleranze: ${assessment.allergies || 'Nessuna'}
+      - Pasti al giorno: ${assessment.mealsPerDay}
+      - Condizioni mediche/Note: ${assessment.conditions || 'Nessuna'}
+
+      RICHIESTA:
+      Genera un JSON rigoroso con le chiavi dei giorni in italiano minuscolo (lunedì, martedì...).
+      Ogni giorno deve avere: "colazione", "pranzo", "cena", "snack" (se pasti > 3), "totale_cal".
+      Struttura:
+      {
+        "lunedì": { "colazione": "...", "pranzo": "...", "cena": "...", "snack": "...", "totale_cal": 2000 },
+        ...
+      }
+      Assicurati che i pasti rispettino le allergie e il tipo di dieta.
+    `;
+    
+    const res = await callGemini(prompt);
+    if(res) {
+      setWeekPlan(res);
+      await setDoc(doc(db, 'artifacts', appId, 'users', user.uid, 'plans', 'current_week'), res);
+      setShowWizard(false);
+    }
+    setLoading(false);
+  };
+
+  // Render Wizard
+  if (showWizard) {
+    return (
+      <div className="p-5 min-h-screen bg-white animate-in slide-in-from-bottom-5">
+        <div className="flex items-center mb-6">
+          <button onClick={() => setShowWizard(false)} className="p-2 -ml-2 text-gray-400"><ChevronLeft/></button>
+          <h2 className="text-xl font-bold ml-2">Personalizza Piano</h2>
+        </div>
+
+        <div className="space-y-6">
+          <div>
+            <label className="block text-sm font-bold text-gray-700 mb-2">Livello di Attività</label>
+            <div className="grid grid-cols-2 gap-3">
+              {['Sedentario', 'Leggero', 'Moderato', 'Intenso'].map(opt => (
+                <button
+                  key={opt}
+                  onClick={() => setAssessment({...assessment, activityLevel: opt})}
+                  className={`p-3 rounded-xl border text-sm font-medium transition-all ${assessment.activityLevel === opt ? 'bg-emerald-50 border-emerald-500 text-emerald-700' : 'border-gray-200 text-gray-600'}`}
+                >
+                  {opt}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div>
+            <label className="block text-sm font-bold text-gray-700 mb-2">Tipo di Dieta</label>
+            <select 
+              value={assessment.dietType} 
+              onChange={(e) => setAssessment({...assessment, dietType: e.target.value})}
+              className="w-full p-4 bg-gray-50 border border-gray-200 rounded-xl"
+            >
+              <option>Onnivoro</option>
+              <option>Vegetariano</option>
+              <option>Vegano</option>
+              <option>Pescatariano</option>
+              <option>Cheto (Keto)</option>
+              <option>Paleo</option>
+              <option>Senza Glutine</option>
+            </select>
+          </div>
+
+          <div>
+            <label className="block text-sm font-bold text-gray-700 mb-2">Numero Pasti</label>
+            <div className="flex gap-3">
+              {['3', '4', '5'].map(num => (
+                <button
+                  key={num}
+                  onClick={() => setAssessment({...assessment, mealsPerDay: num})}
+                  className={`flex-1 p-3 rounded-xl border font-bold ${assessment.mealsPerDay === num ? 'bg-emerald-50 border-emerald-500 text-emerald-700' : 'border-gray-200 text-gray-600'}`}
+                >
+                  {num}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div>
+            <label className="block text-sm font-bold text-gray-700 mb-2">Allergie o Cibi da evitare</label>
+            <input 
+              type="text" 
+              placeholder="Es. Lattosio, Noci, Crostacei..." 
+              value={assessment.allergies}
+              onChange={(e) => setAssessment({...assessment, allergies: e.target.value})}
+              className="w-full p-4 bg-gray-50 border border-gray-200 rounded-xl"
+            />
+          </div>
+
+          <div>
+            <label className="block text-sm font-bold text-gray-700 mb-2">Condizioni Mediche / Note</label>
+            <textarea 
+              placeholder="Es. Diabete tipo 2, colesterolo alto, o semplicemente 'Voglio ricette veloci'..." 
+              value={assessment.conditions}
+              onChange={(e) => setAssessment({...assessment, conditions: e.target.value})}
+              className="w-full p-4 bg-gray-50 border border-gray-200 rounded-xl h-24 resize-none"
+            />
+          </div>
+
+          <button 
+            onClick={generateWeek} 
+            disabled={loading}
+            className="w-full bg-emerald-600 text-white py-4 rounded-xl font-bold shadow-lg hover:bg-emerald-700 flex items-center justify-center gap-2 mt-8"
+          >
+            {loading ? <Loader2 className="animate-spin" /> : "Genera Piano Su Misura"}
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="p-5 min-h-screen bg-white">
+      <div className="flex justify-between items-center mb-6">
+        <h1 className="text-2xl font-bold">Piano Settimanale</h1>
+        {weekPlan && (
+          <button onClick={() => setShowWizard(true)} className="text-sm text-emerald-600 font-medium bg-emerald-50 px-3 py-1 rounded-full">
+            Rigenera
+          </button>
+        )}
+      </div>
+      
+      {!weekPlan ? (
+        <div className="text-center py-20 px-6">
+          <div className="bg-emerald-100 w-20 h-20 rounded-full flex items-center justify-center mx-auto mb-6">
+            <CheckCircle2 className="text-emerald-600" size={32} />
+          </div>
+          <h3 className="text-lg font-bold mb-2">Pronto a iniziare?</h3>
+          <p className="text-gray-500 mb-8">Rispondi a qualche domanda per permettere all'AI di creare un piano nutrizionale perfetto per te.</p>
+          <button 
+            onClick={() => setShowWizard(true)} 
+            className="w-full bg-emerald-600 text-white py-4 rounded-xl font-bold shadow-lg hover:bg-emerald-700 flex items-center justify-center gap-2"
+          >
+            Inizia Questionario
+          </button>
+        </div>
+      ) : (
+        <>
+          {/* Day Selector */}
+          <div className="flex gap-2 overflow-x-auto pb-4 mb-4 no-scrollbar">
+            {days.map(d => (
+              <button 
+                key={d} 
+                onClick={() => setSelectedDay(d)}
+                className={`px-4 py-2 rounded-full whitespace-nowrap text-sm font-medium transition-all ${selectedDay === d ? 'bg-emerald-600 text-white shadow-md' : 'bg-gray-100 text-gray-500'}`}
+              >
+                {d.charAt(0).toUpperCase() + d.slice(1)}
+              </button>
+            ))}
+          </div>
+
+          {/* Plan Details */}
+          <div className="animate-in fade-in slide-in-from-right-4 duration-300">
+            <div className="bg-emerald-50 border border-emerald-100 rounded-2xl p-4 mb-6 flex justify-between items-center">
+              <span className="text-emerald-800 font-medium">Target {weekPlan[selectedDay]?.totale_cal} kcal</span>
+              <span className="text-xs bg-white px-2 py-1 rounded text-emerald-600 border border-emerald-200">{assessment.dietType}</span>
+            </div>
+
+            <div className="space-y-4">
+              {['colazione', 'pranzo', 'cena', 'snack'].map(type => (
+                weekPlan[selectedDay]?.[type] && (
+                  <div key={type} className="bg-white border border-gray-100 p-5 rounded-2xl shadow-sm">
+                    <div className="text-xs uppercase tracking-wider text-gray-400 font-bold mb-2">{type}</div>
+                    <div className="text-gray-800 font-medium leading-relaxed">
+                      {weekPlan[selectedDay][type]}
+                    </div>
+                  </div>
+                )
+              ))}
+            </div>
+            
+            <div className="mt-8 p-4 bg-gray-50 rounded-xl text-center">
+              <p className="text-xs text-gray-400 mb-2">Il piano non ti piace?</p>
+              <button onClick={() => setShowWizard(true)} className="text-emerald-600 font-bold text-sm">
+                Modifica preferenze e rigenera
+              </button>
+            </div>
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
+
+// --- 3. ANALYTICS & TRENDS (RECHARTS) ---
+function TrendsAnalytics({ user }) {
+  const [history, setHistory] = useState([]);
+  const [weightHistory, setWeightHistory] = useState([]);
+
+  useEffect(() => {
+    // Carichiamo gli ultimi 30 giorni di log cibo
+    const d = new Date();
+    d.setDate(d.getDate() - 30);
+    const dateStr = d.toISOString().split('T')[0];
+
+    const qFood = query(collection(db, 'artifacts', appId, 'users', user.uid, 'food_logs'), where("date", ">=", dateStr));
+    const unsubFood = onSnapshot(qFood, (snap) => {
+      // Aggreghiamo per data
+      const raw = snap.docs.map(d => d.data());
+      const aggregated = raw.reduce((acc, curr) => {
+        if (!acc[curr.date]) acc[curr.date] = { date: curr.date, cal: 0, prot: 0 };
+        acc[curr.date].cal += (curr.calories || 0);
+        acc[curr.date].prot += (curr.protein || 0);
+        return acc;
+      }, {});
+      // Trasformiamo in array ordinato
+      setHistory(Object.values(aggregated).sort((a,b) => a.date.localeCompare(b.date)));
+    });
+
+    // Carichiamo storico peso
+    const qWeight = query(collection(db, 'artifacts', appId, 'users', user.uid, 'measurements'), orderBy("date", "asc"));
+    const unsubWeight = onSnapshot(qWeight, (snap) => {
+      setWeightHistory(snap.docs.map(d => d.data()));
+    });
+
+    return () => { unsubFood(); unsubWeight(); };
+  }, [user]);
+
+  return (
+    <div className="p-5 space-y-8 bg-white min-h-screen">
+      <h1 className="text-2xl font-bold">Analisi e Progressi</h1>
+
+      {/* Weight Chart */}
+      <div className="bg-white p-4 rounded-3xl shadow-sm border border-gray-100">
+        <h3 className="text-sm font-bold text-gray-500 mb-4 flex items-center gap-2">
+          <Scale size={16}/> Andamento Peso
+        </h3>
+        <div className="h-48 w-full">
+          {weightHistory.length > 1 ? (
+            <ResponsiveContainer width="100%" height="100%">
+              <LineChart data={weightHistory}>
+                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f0f0f0" />
+                <XAxis dataKey="date" hide />
+                <YAxis domain={['dataMin - 2', 'dataMax + 2']} hide />
+                <RechartsTooltip contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 4px 12px rgba(0,0,0,0.1)' }} />
+                <Line type="monotone" dataKey="weight" stroke="#10b981" strokeWidth={3} dot={{r: 4, fill: '#10b981', strokeWidth:0}} activeDot={{r: 6}} />
+              </LineChart>
+            </ResponsiveContainer>
+          ) : (
+            <div className="h-full flex items-center justify-center text-gray-400 text-sm text-center bg-gray-50 rounded-xl">
+              Registra almeno 2 misurazioni<br/>nel profilo per vedere il grafico
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* Calories Trend */}
+      <div className="bg-white p-4 rounded-3xl shadow-sm border border-gray-100">
+        <h3 className="text-sm font-bold text-gray-500 mb-4 flex items-center gap-2">
+          <TrendingUp size={16}/> Storico Calorie (30gg)
+        </h3>
+        <div className="h-48 w-full">
+          {history.length > 0 ? (
+            <ResponsiveContainer width="100%" height="100%">
+              <AreaChart data={history}>
+                <defs>
+                  <linearGradient id="colorCal" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.3}/>
+                    <stop offset="95%" stopColor="#3b82f6" stopOpacity={0}/>
+                  </linearGradient>
+                </defs>
+                <XAxis dataKey="date" tick={{fontSize: 10}} tickFormatter={(val) => val.split('-')[2]} axisLine={false} tickLine={false} interval={2} />
+                <CartesianGrid vertical={false} stroke="#f3f4f6" />
+                <RechartsTooltip labelFormatter={(l) => `Data: ${l}`} />
+                <Area type="monotone" dataKey="cal" stroke="#3b82f6" fillOpacity={1} fill="url(#colorCal)" strokeWidth={2} />
+              </AreaChart>
+            </ResponsiveContainer>
+          ) : (
+            <div className="h-full flex items-center justify-center text-gray-400 text-sm bg-gray-50 rounded-xl">Dati insufficienti</div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// --- 4. ADD FOOD & PROFILE COMPONENTS (Optimized) ---
+function AddFood({ user, profile, close }) {
+  const [mode, setMode] = useState('camera');
+  const [image, setImage] = useState(null);
+  const [text, setText] = useState('');
+  const [loading, setLoading] = useState(false);
+  const fileRef = useRef(null);
+
+  const analyze = async () => {
+    setLoading(true);
+    let prompt = mode === 'camera' 
+      ? `Analizza questa immagine (cibo o barcode). Stima valori nutrizionali per una porzione media. Profilo utente: ${JSON.stringify(profile)}. JSON output: {name, calories, protein, carbs, fat, note}`
+      : `Stima nutrienti per: "${text}". JSON output: {name, calories, protein, carbs, fat, note}`;
+    
+    const res = await callGemini(prompt, image);
+    if (res) {
+      await addDoc(collection(db, 'artifacts', appId, 'users', user.uid, 'food_logs'), {
+        ...res, date: new Date().toISOString().split('T')[0], timestamp: new Date().toISOString()
+      });
+      close();
+    } else {
+      alert("Errore analisi.");
+    }
+    setLoading(false);
+  };
+
+  const handleFile = (e) => {
+    const reader = new FileReader();
+    reader.onload = () => setImage(reader.result.split(',')[1]);
+    if(e.target.files[0]) reader.readAsDataURL(e.target.files[0]);
+  };
+
+  return (
+    <div className="fixed inset-0 bg-white z-50 p-6 flex flex-col animate-in slide-in-from-bottom-10">
+      <div className="flex justify-between items-center mb-8">
+        <h2 className="text-2xl font-bold">Nuovo Pasto</h2>
+        <button onClick={close} className="bg-gray-100 p-2 rounded-full"><X/></button>
+      </div>
+
+      <div className="flex bg-gray-100 p-1 rounded-xl mb-6">
+        <button onClick={() => setMode('camera')} className={`flex-1 py-3 rounded-lg font-medium text-sm ${mode==='camera'?'bg-white shadow-sm':''}`}>Foto / Scan</button>
+        <button onClick={() => setMode('text')} className={`flex-1 py-3 rounded-lg font-medium text-sm ${mode==='text'?'bg-white shadow-sm':''}`}>Testo</button>
+      </div>
+
+      <div className="flex-1">
+        {mode === 'camera' ? (
+          <div onClick={() => fileRef.current.click()} className="h-64 border-2 border-dashed border-gray-300 rounded-3xl flex flex-col items-center justify-center bg-gray-50 relative overflow-hidden cursor-pointer">
+            <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={handleFile} />
+            {image ? <img src={`data:image/jpeg;base64,${image}`} className="absolute inset-0 w-full h-full object-cover" /> : <><Camera size={40} className="text-gray-400 mb-2"/><span className="text-gray-400">Tocca per scattare</span></>}
+          </div>
+        ) : (
+          <textarea value={text} onChange={e=>setText(e.target.value)} placeholder="Es: 2 uova e pane tostato" className="w-full h-40 p-4 bg-gray-50 rounded-2xl border-none focus:ring-2 ring-emerald-500 resize-none" />
+        )}
+      </div>
+
+      <button onClick={analyze} disabled={loading || (!image && !text)} className="w-full bg-emerald-600 text-white py-4 rounded-xl font-bold text-lg shadow-xl mb-safe flex items-center justify-center gap-2">
+        {loading ? <Loader2 className="animate-spin"/> : <><ScanLine/> Analizza e Salva</>}
+      </button>
+    </div>
+  );
+}
+
+function UserProfile({ user, profile, setProfile }) {
+  const [formData, setFormData] = useState(profile);
+  const [newWeight, setNewWeight] = useState('');
+
+  const save = async () => {
+    await setDoc(doc(db, 'artifacts', appId, 'users', user.uid, 'profile', 'main'), formData);
+    setProfile(formData);
+    alert("Profilo aggiornato!");
+  };
+
+  const logWeight = async () => {
+    if(!newWeight) return;
+    await addDoc(collection(db, 'artifacts', appId, 'users', user.uid, 'measurements'), {
+      weight: parseFloat(newWeight),
+      date: new Date().toISOString().split('T')[0]
+    });
+    setNewWeight('');
+    alert("Peso registrato!");
+  };
+
+  return (
+    <div className="p-5 min-h-screen bg-white">
+      <h1 className="text-2xl font-bold mb-6">Il tuo Profilo</h1>
+      
+      <div className="space-y-4 mb-8">
+        <div className="grid grid-cols-2 gap-4">
+          <Input label="Età" val={formData.age} onChange={v => setFormData({...formData, age: v})} />
+          <Input label="Altezza (cm)" val={formData.height} onChange={v => setFormData({...formData, height: v})} />
+        </div>
+        <div className="grid grid-cols-2 gap-4">
+           <Input label="Peso Attuale (kg)" val={formData.weight} onChange={v => setFormData({...formData, weight: v})} />
+           <div>
+             <label className="text-xs text-gray-500 font-bold ml-1 uppercase">Sesso</label>
+             <select value={formData.gender} onChange={e => setFormData({...formData, gender: e.target.value})} className="w-full p-4 bg-gray-50 rounded-xl mt-1 border-none font-medium">
+               <option>Uomo</option><option>Donna</option>
+             </select>
+           </div>
+        </div>
+        <div>
+          <label className="text-xs text-gray-500 font-bold ml-1 uppercase">Obiettivo</label>
+          <select value={formData.goal} onChange={e => setFormData({...formData, goal: e.target.value})} className="w-full p-4 bg-gray-50 rounded-xl mt-1 border-none font-medium">
+            <option>Dimagrimento</option><option>Mantenimento</option><option>Aumento Massa</option>
+          </select>
+        </div>
+        <button onClick={save} className="w-full bg-gray-900 text-white py-4 rounded-xl font-bold">Salva Profilo</button>
+      </div>
+
+      <div className="bg-emerald-50 p-6 rounded-3xl border border-emerald-100">
+        <h3 className="font-bold text-emerald-900 mb-4 flex items-center gap-2"><Scale size={18}/> Aggiorna Peso</h3>
+        <div className="flex gap-3">
+          <input type="number" placeholder="kg" value={newWeight} onChange={e => setNewWeight(e.target.value)} className="w-24 p-3 rounded-xl border-none text-center font-bold text-lg" />
+          <button onClick={logWeight} className="flex-1 bg-emerald-600 text-white rounded-xl font-bold shadow-md">Registra Misurazione</button>
+        </div>
+        <p className="text-xs text-emerald-700 mt-3 leading-relaxed">I dati inseriti qui verranno visualizzati nel grafico "Analisi" per monitorare i tuoi progressi.</p>
+      </div>
+    </div>
+  );
+}
+
+const Input = ({ label, val, onChange }) => (
+  <div>
+    <label className="text-xs text-gray-500 font-bold ml-1 uppercase">{label}</label>
+    <input type="number" value={val} onChange={e => onChange(e.target.value)} className="w-full p-4 bg-gray-50 rounded-xl mt-1 border-none font-medium focus:ring-2 ring-emerald-500" />
+  </div>
+);
