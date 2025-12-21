@@ -2,12 +2,13 @@
 <html lang="it">
   <head>
     <meta charset="UTF-8" />
-    <link rel="icon" type="image/svg+xml" href="/vite.svg" />
+    <!-- Usa ./ per il favicon -->
+    <link rel="icon" type="image/svg+xml" href="./vite.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
     <meta name="theme-color" content="#10b981" />
     
-    <!-- Link al Manifest per la PWA -->
-    <link rel="manifest" href="/manifest.json" />
+    <!-- Link al Manifest per la PWA (percorso relativo) -->
+    <link rel="manifest" href="./manifest.json" />
     
     <!-- TAILWIND CSS (Via CDN per evitare configurazioni complesse) -->
     <script src="https://cdn.tailwindcss.com"></script>
@@ -17,14 +18,15 @@
   <body>
     <div id="root"></div>
     
-    <!-- IMPORTANTE: Rimuovi "import './index.css'" dentro questo file se ti da errore -->
-    <script type="module" src="/src/main.jsx"></script>
+    <!-- IMPORTANTE: Usa ./src/... per supportare le sottocartelle di GitHub Pages -->
+    <script type="module" src="./src/main.jsx"></script>
 
     <!-- Registrazione Service Worker (necessario per installazione su Android) -->
     <script>
       if ('serviceWorker' in navigator) {
         window.addEventListener('load', () => {
-          navigator.serviceWorker.register('/sw.js')
+          // Usa ./sw.js per cercare il file nella stessa cartella dell'index.html
+          navigator.serviceWorker.register('./sw.js')
             .then((registration) => {
               console.log('SW registrato con successo:', registration.scope);
             })
