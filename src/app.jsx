@@ -6,7 +6,19 @@ import { getFirestore, collection, addDoc, query, onSnapshot, deleteDoc, doc, se
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer, AreaChart, Area } from 'recharts';
 
 // --- CONFIGURAZIONE FIREBASE ---
-const firebaseConfig = JSON.parse(__firebase_config);
+// Your web app's Firebase configuration
+// For Firebase JS SDK v7.20.0 and later, measurementId is optional
+const firebaseConfig = {
+  apiKey: "AIzaSyDDQlIeeWw19Eo6qnszCyrXyG4Bc35BLhk",
+  authDomain: "bookscoutpro.firebaseapp.com",
+  projectId: "bookscoutpro",
+  storageBucket: "bookscoutpro.firebasestorage.app",
+  messagingSenderId: "124845335540",
+  appId: "1:124845335540:web:79e3e82a919cf0890ccfa1",
+  measurementId: "G-C1HH2R0RBB"
+};
+        
+		
 const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
 const db = getFirestore(app);
