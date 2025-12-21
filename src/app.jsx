@@ -7,17 +7,14 @@ import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip as RechartsToolti
 
 // --- CONFIGURAZIONE FIREBASE ---
 // Your web app's Firebase configuration
-// For Firebase JS SDK v7.20.0 and later, measurementId is optional
 const firebaseConfig = {
-  apiKey: "AIzaSyDDQlIeeWw19Eo6qnszCyrXyG4Bc35BLhk",
-  authDomain: "bookscoutpro.firebaseapp.com",
-  projectId: "bookscoutpro",
-  storageBucket: "bookscoutpro.firebasestorage.app",
-  messagingSenderId: "124845335540",
-  appId: "1:124845335540:web:79e3e82a919cf0890ccfa1",
-  measurementId: "G-C1HH2R0RBB"
+  apiKey: "AIzaSyDZp4rC_LYox1YlBW8eDqsycmqH08i4zP8",
+  authDomain: "nutriai-f081c.firebaseapp.com",
+  projectId: "nutriai-f081c",
+  storageBucket: "nutriai-f081c.firebasestorage.app",
+  messagingSenderId: "841982374698",
+  appId: "1:841982374698:web:0289d0aac7d926b07ce453"
 };
-        
 		
 const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
