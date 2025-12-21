@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html lang="it">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" type="image/svg+xml" href="/vite.svg" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+    <meta name="theme-color" content="#10b981" />
+    
+    <!-- Link al Manifest per la PWA -->
+    <link rel="manifest" href="/manifest.json" />
+    
+    <title>NutriAI - Nutrizionista</title>
+  </head>
+  <body>
+    <div id="root"></div>
+    
+    <!-- IMPORTANTE: Questo percorso deve puntare al tuo file di ingresso React. 
+         Assicurati di avere un file src/main.jsx che importa il tuo componente App. -->
+    <script type="module" src="/src/main.jsx"></script>
+
+    <!-- Registrazione Service Worker (necessario per installazione su Android) -->
+    <script>
+      if ('serviceWorker' in navigator) {
+        window.addEventListener('load', () => {
+          navigator.serviceWorker.register('/sw.js')
+            .then((registration) => {
+              console.log('SW registrato con successo:', registration.scope);
+            })
+            .catch((err) => {
+              console.log('SW fallito:', err);
+            });
+        });
+      }
+    </script>
+  </body>
+</html>
