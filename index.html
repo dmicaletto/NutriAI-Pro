@@ -9,13 +9,15 @@
     <!-- Link al Manifest per la PWA -->
     <link rel="manifest" href="/manifest.json" />
     
+    <!-- TAILWIND CSS (Via CDN per evitare configurazioni complesse) -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    
     <title>NutriAI - Nutrizionista</title>
   </head>
   <body>
     <div id="root"></div>
     
-    <!-- IMPORTANTE: Questo percorso deve puntare al tuo file di ingresso React. 
-         Assicurati di avere un file src/main.jsx che importa il tuo componente App. -->
+    <!-- IMPORTANTE: Rimuovi "import './index.css'" dentro questo file se ti da errore -->
     <script type="module" src="/src/main.jsx"></script>
 
     <!-- Registrazione Service Worker (necessario per installazione su Android) -->
