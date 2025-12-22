@@ -15,7 +15,7 @@ const firebaseConfig = {
   appId: "1:841982374698:web:0289d0aac7d926b07ce453"
 };
 
-// Initialize Firebase;
+// Initialize Firebase
 const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
 const db = getFirestore(app);
@@ -73,10 +73,7 @@ async function callGemini(prompt, apiKey, imageBase64 = null, jsonMode = true) {
 // --- BACKGROUND PATTERN COMPONENT ---
 const BackgroundPattern = () => (
   <div className="fixed inset-0 z-0 pointer-events-none overflow-hidden bg-emerald-600">
-    {/* Gradient Overlay */}
     <div className="absolute inset-0 bg-gradient-to-b from-emerald-500 to-emerald-700 opacity-90"></div>
-    
-    {/* Decorative Elements */}
     <svg className="absolute top-0 left-0 w-full h-full opacity-10" xmlns="http://www.w3.org/2000/svg">
       <circle cx="10%" cy="10%" r="50" fill="white" />
       <circle cx="90%" cy="20%" r="30" fill="white" />
@@ -139,7 +136,7 @@ export default function NutriAIPro() {
     loadData();
   }, [user]);
 
-  // 3. Gestione Aggiornamenti Service Worker (per evitare schermata bianca)
+  // 3. Gestione Aggiornamenti Service Worker
   useEffect(() => {
     if ('serviceWorker' in navigator) {
       navigator.serviceWorker.addEventListener('controllerchange', () => {
@@ -157,12 +154,9 @@ export default function NutriAIPro() {
   return (
     <div className="relative min-h-screen font-sans text-gray-800 pb-24 md:max-w-md md:mx-auto md:shadow-2xl md:min-h-screen md:border-x border-gray-200 bg-gray-50">
       
-      {/* BACKGROUND GLOBALE */}
       <BackgroundPattern />
 
-      {/* CONTENT AREA (z-10 to stay above background) */}
       <div className="relative z-10 p-4 min-h-screen">
-        
         {!apiKey && (
            <div className="bg-white/90 backdrop-blur p-4 rounded-2xl shadow-lg border border-red-100 text-xs text-red-800 text-center mb-4">
              <div className="flex items-center justify-center gap-2 mb-2 font-bold">
@@ -186,15 +180,12 @@ export default function NutriAIPro() {
           {activeTab === 'daily' && <DailyView user={user} profile={profile} setActiveTab={setActiveTab} apiKey={apiKey} />}
           {activeTab === 'planner' && <WeeklyPlanner user={user} profile={profile} apiKey={apiKey} />}
           {activeTab === 'trends' && <TrendsAnalytics user={user} />}
-          {/* AddFood Rimosso da qui e spostato fuori per risolvere i problemi di z-index */}
           {activeTab === 'profile' && <UserProfile user={user} profile={profile} setProfile={setProfile} setAuthMode={setAuthMode} />}
         </div>
       </div>
 
-      {/* MODALI A LIVELLO ROOT (Per z-index corretto sopra la bottom bar) */}
       {activeTab === 'add' && <AddFood user={user} profile={profile} close={() => setActiveTab('daily')} apiKey={apiKey} />}
 
-      {/* BOTTOM NAV (Fixed) */}
       <div className="fixed bottom-0 left-0 right-0 md:w-full md:max-w-md md:mx-auto bg-white/95 backdrop-blur-md border-t border-gray-200 px-6 py-3 flex justify-between items-end z-50 pb-safe shadow-lg-up rounded-t-3xl">
         <NavBtn icon={<PieChart size={22} />} label="Oggi" active={activeTab === 'daily'} onClick={() => setActiveTab('daily')} />
         <NavBtn icon={<Calendar size={22} />} label="Piano" active={activeTab === 'planner'} onClick={() => setActiveTab('planner')} />
@@ -213,7 +204,7 @@ export default function NutriAIPro() {
   );
 }
 
-// ... AUTH SCREEN (Invariato) ...
+// ... AUTH SCREEN, NavBtn ... (Codice invariato, abbreviato per brevità se già corretto)
 function AuthScreen({ mode, setMode }) {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -279,7 +270,7 @@ const NavBtn = ({ icon, label, active, onClick }) => (
   </button>
 );
 
-// ... VIEW COMPONENTS (DailyView, Trends, ecc. invariati salvo dove richiamano AddFood) ...
+// ... DailyView, WeeklyPlanner ...
 function DailyView({ user, profile, setActiveTab, apiKey }) {
   const [logs, setLogs] = useState([]);
   const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
@@ -411,134 +402,6 @@ const MacroPill = ({ label, val, total, color }) => (
   </div>
 );
 
-// --- NEW COMPONENT: ADD FOOD WITH FIX FOR MOBILE LAYOUT ---
-function AddFood({ user, profile, close, apiKey }) {
-  const [mode, setMode] = useState('camera');
-  const [image, setImage] = useState(null);
-  const [text, setText] = useState('');
-  const [loading, setLoading] = useState(false);
-  const [reviewData, setReviewData] = useState(null);
-  const fileRef = useRef(null);
-
-  const analyze = async () => {
-    if(!apiKey) return alert("API Key non trovata!");
-    setLoading(true);
-    let prompt = "";
-    const baseReq = `Rispondi ESCLUSIVAMENTE con un JSON valido (no markdown): { "name": "Nome piatto", "calories": numero, "protein": num, "carbs": num, "fat": num, "note": "commento" }.`;
-    if (mode === 'camera') prompt = `Analizza immagine cibo. Contesto: "${text}". Stima valori. ${baseReq}`;
-    else prompt = `Analizza pasto: "${text}". Stima valori. ${baseReq}`;
-
-    const res = await callGemini(prompt, apiKey, image);
-    setLoading(false);
-    if (res) setReviewData(res);
-    else alert("Riprova, analisi fallita.");
-  };
-
-  const saveLog = async () => {
-      if(!reviewData) return;
-      await addDoc(collection(db, 'artifacts', appId, 'users', user.uid, 'food_logs'), { ...reviewData, date: new Date().toISOString().split('T')[0], timestamp: new Date().toISOString() });
-      close();
-  };
-
-  const handleFile = (e) => {
-    const reader = new FileReader();
-    reader.onload = () => setImage(reader.result.split(',')[1]);
-    if(e.target.files[0]) reader.readAsDataURL(e.target.files[0]);
-  };
-
-  // VISTA REVISIONE (Step 2)
-  if (reviewData) {
-      return (
-          <div className="fixed inset-0 z-[60] bg-gray-50 flex flex-col h-[100dvh]">
-              <BackgroundPattern />
-              <div className="relative z-10 flex flex-col h-full">
-                <div className="bg-white/90 backdrop-blur p-4 shadow-sm flex items-center justify-between pt-safe-top border-b border-gray-200">
-                  <button onClick={() => setReviewData(null)} className="p-2 bg-gray-100 rounded-full"><ChevronLeft/></button>
-                  <h2 className="font-bold text-lg">Conferma Dati</h2>
-                  <div className="w-10"></div>
-                </div>
-                
-                <div className="flex-1 overflow-y-auto p-6 space-y-6 pb-24">
-                    <div className="bg-white/90 backdrop-blur p-4 rounded-xl text-emerald-800 text-sm flex gap-3 items-center shadow-sm">
-                      <Sparkles className="shrink-0 text-emerald-600"/>
-                      <p>Ho stimato questi valori. Correggili se necessario.</p>
-                    </div>
-                    <div>
-                        <label className="text-xs font-bold text-white uppercase ml-1">Pasto</label>
-                        <input value={reviewData.name} onChange={e => setReviewData({...reviewData, name: e.target.value})} className="w-full p-4 bg-white/95 backdrop-blur rounded-xl mt-1 font-bold text-lg shadow-sm border border-white/50" />
-                    </div>
-                    <div className="grid grid-cols-2 gap-4">
-                        <div><label className="text-xs font-bold text-white uppercase ml-1">Kcal</label><input type="number" value={reviewData.calories} onChange={e => setReviewData({...reviewData, calories: Number(e.target.value)})} className="w-full p-4 bg-white/95 backdrop-blur rounded-xl mt-1 font-bold text-emerald-600 text-xl shadow-sm border border-white/50" /></div>
-                        <div className="space-y-2">
-                             <div className="bg-white/95 backdrop-blur p-2 rounded-lg shadow-sm flex justify-between text-sm"><span>Prot</span><input type="number" value={reviewData.protein} onChange={e => setReviewData({...reviewData, protein: Number(e.target.value)})} className="w-12 text-right font-bold text-blue-600 outline-none bg-transparent"/></div>
-                             <div className="bg-white/95 backdrop-blur p-2 rounded-lg shadow-sm flex justify-between text-sm"><span>Carb</span><input type="number" value={reviewData.carbs} onChange={e => setReviewData({...reviewData, carbs: Number(e.target.value)})} className="w-12 text-right font-bold text-amber-600 outline-none bg-transparent"/></div>
-                             <div className="bg-white/95 backdrop-blur p-2 rounded-lg shadow-sm flex justify-between text-sm"><span>Gras</span><input type="number" value={reviewData.fat} onChange={e => setReviewData({...reviewData, fat: Number(e.target.value)})} className="w-12 text-right font-bold text-rose-600 outline-none bg-transparent"/></div>
-                        </div>
-                    </div>
-                </div>
-
-                <div className="p-4 bg-white/90 backdrop-blur border-t border-gray-200 pb-safe">
-                    <div className="flex gap-3">
-                      <button onClick={() => setReviewData(null)} className="flex-1 py-4 font-bold text-gray-500 bg-gray-100 rounded-xl">Annulla</button>
-                      <button onClick={saveLog} className="flex-[2] py-4 bg-emerald-600 text-white rounded-xl font-bold shadow-lg flex justify-center gap-2 items-center"><CheckCircle2/> Salva</button>
-                    </div>
-                </div>
-              </div>
-          </div>
-      )
-  }
-
-  // VISTA INPUT (Step 1)
-  return (
-    <div className="fixed inset-0 z-[60] bg-gray-50 flex flex-col h-[100dvh]">
-      <BackgroundPattern />
-      <div className="relative z-10 flex flex-col h-full">
-        <div className="bg-white/90 backdrop-blur p-4 pt-safe-top flex justify-between items-center shadow-sm border-b border-gray-200">
-          <h2 className="text-xl font-bold text-gray-800">Nuovo Pasto</h2>
-          <button onClick={close} className="bg-gray-100 p-2 rounded-full hover:bg-gray-200"><X size={20}/></button>
-        </div>
-        
-        <div className="flex-1 flex flex-col p-4 overflow-y-auto pb-24">
-          <div className="bg-white/90 backdrop-blur p-1 rounded-xl shadow-sm mb-6 flex border border-white/50">
-            <button onClick={() => setMode('camera')} className={`flex-1 py-2 rounded-lg text-sm font-bold transition-all ${mode==='camera'?'bg-emerald-100 text-emerald-700 shadow-sm':'text-gray-400'}`}>Foto</button>
-            <button onClick={() => setMode('text')} className={`flex-1 py-2 rounded-lg text-sm font-bold transition-all ${mode==='text'?'bg-emerald-100 text-emerald-700 shadow-sm':'text-gray-400'}`}>Testo</button>
-          </div>
-          
-          {mode === 'camera' ? (
-            <div className="space-y-4">
-                <div onClick={() => fileRef.current.click()} className="h-64 border-2 border-dashed border-white/60 bg-white/30 backdrop-blur rounded-3xl flex flex-col items-center justify-center cursor-pointer relative hover:bg-white/40 transition-colors shadow-sm">
-                   <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={handleFile} />
-                   {image ? <img src={`data:image/jpeg;base64,${image}`} className="absolute inset-0 w-full h-full object-cover rounded-3xl"/> : <div className="flex flex-col items-center text-white"><Camera size={48} className="mb-2 drop-shadow-md"/><span className="font-bold drop-shadow-md">Scatta Foto</span></div>}
-                </div>
-                <div>
-                    <label className="text-xs font-bold text-white uppercase ml-1 drop-shadow-sm">Note (es. "Senza olio")</label>
-                    <input value={text} onChange={e => setText(e.target.value)} className="w-full p-4 bg-white/95 backdrop-blur rounded-xl mt-1 border border-white/50 shadow-sm focus:ring-2 ring-emerald-500 outline-none" />
-                </div>
-            </div>
-          ) : (
-            <textarea value={text} onChange={e=>setText(e.target.value)} className="w-full h-64 p-4 bg-white/95 backdrop-blur rounded-2xl border border-white/50 shadow-sm focus:ring-2 ring-emerald-500 text-lg placeholder-gray-400 resize-none" placeholder="Es: Pasta al pomodoro e una mela..." />
-          )}
-        </div>
-        
-        {/* BARRA AZIONI FISSA IN BASSO */}
-        <div className="p-4 bg-white/90 backdrop-blur border-t border-gray-200 pb-safe">
-          <div className="flex gap-3">
-            <button onClick={close} className="px-6 py-4 rounded-xl font-bold text-gray-500 bg-gray-100 hover:bg-gray-200 transition-colors">Annulla</button>
-            <button 
-              onClick={analyze} 
-              disabled={loading || (mode==='camera' && !image) || (mode==='text' && !text)} 
-              className="flex-1 bg-emerald-600 text-white py-4 rounded-xl font-bold shadow-lg flex justify-center items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed hover:bg-emerald-700 transition-colors"
-            >
-                {loading ? <Loader2 className="animate-spin"/> : <><ScanLine/> Analizza</>}
-            </button>
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-// ... WeeklyPlanner, TrendsAnalytics, UserProfile (Invariati) ...
 function WeeklyPlanner({ user, profile, apiKey }) {
   const [weekPlan, setWeekPlan] = useState(null);
   const [showWizard, setShowWizard] = useState(false);
@@ -613,43 +476,213 @@ function WeeklyPlanner({ user, profile, apiKey }) {
   );
 }
 
+// --- RESTORED TOOLTIP CUSTOM COMPONENT ---
+const TooltipCustom = ({ active, payload, label }) => {
+  if (active && payload && payload.length) {
+    return (
+      <div className="bg-white/95 backdrop-blur p-3 shadow-xl rounded-xl border border-white/50 text-xs text-gray-700">
+        <p className="font-bold mb-1">{label}</p>
+        <p className="text-emerald-600 font-bold">
+          {payload[0].value} {payload[0].name === 'weight' ? 'kg' : 'kcal'}
+        </p>
+      </div>
+    );
+  }
+  return null;
+};
+
+// ... TrendsAnalytics ...
 function TrendsAnalytics({ user }) {
   const [history, setHistory] = useState([]);
   const [weightHistory, setWeightHistory] = useState([]);
 
   useEffect(() => {
-    // ... (Logica identica a prima) ...
     const d = new Date(); d.setDate(d.getDate() - 30);
     const dateStr = d.toISOString().split('T')[0];
+    
+    // Safety check for logs
     const qFood = query(collection(db, 'artifacts', appId, 'users', user.uid, 'food_logs'), where("date", ">=", dateStr));
     const unsubFood = onSnapshot(qFood, (snap) => {
-      const agg = snap.docs.reduce((acc, d) => { const data = d.data(); if(!acc[data.date]) acc[data.date] = {date: data.date, cal:0}; acc[data.date].cal += (data.calories || 0); return acc; }, {});
+      const agg = snap.docs.reduce((acc, d) => { 
+        const data = d.data();
+        if (data.date) { 
+            if(!acc[data.date]) acc[data.date] = {date: data.date, cal:0}; 
+            acc[data.date].cal += (data.calories || 0); 
+        }
+        return acc; 
+      }, {});
       setHistory(Object.values(agg).sort((a,b)=>a.date.localeCompare(b.date)));
-    });
+    }, (error) => console.error("Food logs error:", error));
+
     const qWeight = query(collection(db, 'artifacts', appId, 'users', user.uid, 'measurements'), orderBy("date", "asc"));
-    const unsubWeight = onSnapshot(qWeight, (snap) => setWeightHistory(snap.docs.map(d=>d.data())));
+    const unsubWeight = onSnapshot(qWeight, (snap) => {
+      setWeightHistory(snap.docs.map(d=>d.data()).filter(d => d.date && d.weight)); 
+    }, (error) => console.error("Weight error:", error));
+
     return () => { unsubFood(); unsubWeight(); };
   }, [user]);
 
   return (
     <div className="space-y-6 pb-20">
       <h1 className="text-2xl font-bold text-white pt-2">I tuoi progressi</h1>
+      
       <div className="bg-white/95 backdrop-blur p-5 rounded-3xl shadow-xl border border-white/50 h-72">
         <h3 className="text-sm font-bold text-gray-500 mb-4 flex items-center gap-2"><Scale size={16}/> Peso</h3>
         <ResponsiveContainer width="100%" height="85%">
-          <LineChart data={weightHistory}><CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f0f0f0"/><Line type="monotone" dataKey="weight" stroke="#10b981" strokeWidth={3} dot={{fill:'#10b981', r:4}} /><XAxis hide/><TooltipCustom/></LineChart>
+          <LineChart data={weightHistory}>
+            <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f0f0f0"/>
+            <Line type="monotone" dataKey="weight" stroke="#10b981" strokeWidth={3} dot={{fill:'#10b981', r:4}} />
+            <XAxis dataKey="date" hide />
+            <RechartsTooltip content={<TooltipCustom/>} />
+          </LineChart>
         </ResponsiveContainer>
       </div>
+      
        <div className="bg-white/95 backdrop-blur p-5 rounded-3xl shadow-xl border border-white/50 h-72">
         <h3 className="text-sm font-bold text-gray-500 mb-4 flex items-center gap-2"><TrendingUp size={16}/> Calorie (30gg)</h3>
         <ResponsiveContainer width="100%" height="85%">
-          <AreaChart data={history}><CartesianGrid vertical={false} stroke="#f0f0f0"/><Area type="monotone" dataKey="cal" stroke="#3b82f6" fill="#eff6ff" strokeWidth={2} /><XAxis dataKey="date" tick={{fontSize:10}} tickFormatter={v=>v.slice(8)} interval={2} /><TooltipCustom/></AreaChart>
+          <AreaChart data={history}>
+            <CartesianGrid vertical={false} stroke="#f0f0f0"/>
+            <Area type="monotone" dataKey="cal" stroke="#3b82f6" fill="#eff6ff" strokeWidth={2} />
+            <XAxis 
+                dataKey="date" 
+                tick={{fontSize:10}} 
+                tickFormatter={v => v ? v.slice(8) : ''} 
+                interval={2} 
+            />
+            <RechartsTooltip content={<TooltipCustom/>} />
+          </AreaChart>
         </ResponsiveContainer>
       </div>
     </div>
   );
 }
 
+// ... AddFood ...
+function AddFood({ user, profile, close, apiKey }) {
+  const [mode, setMode] = useState('camera');
+  const [image, setImage] = useState(null);
+  const [text, setText] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [reviewData, setReviewData] = useState(null);
+  const fileRef = useRef(null);
+
+  const analyze = async () => {
+    if(!apiKey) return alert("API Key non trovata!");
+    setLoading(true);
+    let prompt = "";
+    const baseReq = `Rispondi ESCLUSIVAMENTE con un JSON valido (no markdown): { "name": "Nome piatto", "calories": numero, "protein": num, "carbs": num, "fat": num, "note": "commento" }.`;
+    if (mode === 'camera') prompt = `Analizza immagine cibo. Contesto: "${text}". Stima valori. ${baseReq}`;
+    else prompt = `Analizza pasto: "${text}". Stima valori. ${baseReq}`;
+
+    const res = await callGemini(prompt, apiKey, image);
+    setLoading(false);
+    if (res) setReviewData(res);
+    else alert("Riprova, analisi fallita.");
+  };
+
+  const saveLog = async () => {
+      if(!reviewData) return;
+      await addDoc(collection(db, 'artifacts', appId, 'users', user.uid, 'food_logs'), { ...reviewData, date: new Date().toISOString().split('T')[0], timestamp: new Date().toISOString() });
+      close();
+  };
+
+  const handleFile = (e) => {
+    const reader = new FileReader();
+    reader.onload = () => setImage(reader.result.split(',')[1]);
+    if(e.target.files[0]) reader.readAsDataURL(e.target.files[0]);
+  };
+
+  if (reviewData) {
+      return (
+          <div className="fixed inset-0 z-[60] bg-gray-50 flex flex-col h-[100dvh]">
+              <BackgroundPattern />
+              <div className="relative z-10 flex flex-col h-full">
+                <div className="bg-white/90 backdrop-blur p-4 shadow-sm flex items-center justify-between pt-safe-top border-b border-gray-200">
+                  <button onClick={() => setReviewData(null)} className="p-2 bg-gray-100 rounded-full"><ChevronLeft/></button>
+                  <h2 className="font-bold text-lg">Conferma Dati</h2>
+                  <div className="w-10"></div>
+                </div>
+                
+                <div className="flex-1 overflow-y-auto p-6 space-y-6 pb-24">
+                    <div className="bg-white/90 backdrop-blur p-4 rounded-xl text-emerald-800 text-sm flex gap-3 items-center shadow-sm">
+                      <Sparkles className="shrink-0 text-emerald-600"/>
+                      <p>Ho stimato questi valori. Correggili se necessario.</p>
+                    </div>
+                    <div>
+                        <label className="text-xs font-bold text-white uppercase ml-1">Pasto</label>
+                        <input value={reviewData.name} onChange={e => setReviewData({...reviewData, name: e.target.value})} className="w-full p-4 bg-white/95 backdrop-blur rounded-xl mt-1 font-bold text-lg shadow-sm border border-white/50" />
+                    </div>
+                    <div className="grid grid-cols-2 gap-4">
+                        <div><label className="text-xs font-bold text-white uppercase ml-1">Kcal</label><input type="number" value={reviewData.calories} onChange={e => setReviewData({...reviewData, calories: Number(e.target.value)})} className="w-full p-4 bg-white/95 backdrop-blur rounded-xl mt-1 font-bold text-emerald-600 text-xl shadow-sm border border-white/50" /></div>
+                        <div className="space-y-2">
+                             <div className="bg-white/95 backdrop-blur p-2 rounded-lg shadow-sm flex justify-between text-sm"><span>Prot</span><input type="number" value={reviewData.protein} onChange={e => setReviewData({...reviewData, protein: Number(e.target.value)})} className="w-12 text-right font-bold text-blue-600 outline-none bg-transparent"/></div>
+                             <div className="bg-white/95 backdrop-blur p-2 rounded-lg shadow-sm flex justify-between text-sm"><span>Carb</span><input type="number" value={reviewData.carbs} onChange={e => setReviewData({...reviewData, carbs: Number(e.target.value)})} className="w-12 text-right font-bold text-amber-600 outline-none bg-transparent"/></div>
+                             <div className="bg-white/95 backdrop-blur p-2 rounded-lg shadow-sm flex justify-between text-sm"><span>Gras</span><input type="number" value={reviewData.fat} onChange={e => setReviewData({...reviewData, fat: Number(e.target.value)})} className="w-12 text-right font-bold text-rose-600 outline-none bg-transparent"/></div>
+                        </div>
+                    </div>
+                </div>
+
+                <div className="p-4 bg-white/90 backdrop-blur border-t border-gray-200 pb-safe">
+                    <div className="flex gap-3">
+                      <button onClick={() => setReviewData(null)} className="flex-1 py-4 font-bold text-gray-500 bg-gray-100 rounded-xl">Annulla</button>
+                      <button onClick={saveLog} className="flex-[2] py-4 bg-emerald-600 text-white rounded-xl font-bold shadow-lg flex justify-center gap-2 items-center"><CheckCircle2/> Salva</button>
+                    </div>
+                </div>
+              </div>
+          </div>
+      )
+  }
+
+  return (
+    <div className="fixed inset-0 z-[60] bg-gray-50 flex flex-col h-[100dvh]">
+      <BackgroundPattern />
+      <div className="relative z-10 flex flex-col h-full">
+        <div className="bg-white/90 backdrop-blur p-4 pt-safe-top flex justify-between items-center shadow-sm border-b border-gray-200">
+          <h2 className="text-xl font-bold text-gray-800">Nuovo Pasto</h2>
+          <button onClick={close} className="bg-gray-100 p-2 rounded-full hover:bg-gray-200"><X size={20}/></button>
+        </div>
+        
+        <div className="flex-1 flex flex-col p-4 overflow-y-auto pb-24">
+          <div className="bg-white/90 backdrop-blur p-1 rounded-xl shadow-sm mb-6 flex border border-white/50">
+            <button onClick={() => setMode('camera')} className={`flex-1 py-2 rounded-lg text-sm font-bold transition-all ${mode==='camera'?'bg-emerald-100 text-emerald-700 shadow-sm':'text-gray-400'}`}>Foto</button>
+            <button onClick={() => setMode('text')} className={`flex-1 py-2 rounded-lg text-sm font-bold transition-all ${mode==='text'?'bg-emerald-100 text-emerald-700 shadow-sm':'text-gray-400'}`}>Testo</button>
+          </div>
+          
+          {mode === 'camera' ? (
+            <div className="space-y-4">
+                <div onClick={() => fileRef.current.click()} className="h-64 border-2 border-dashed border-white/60 bg-white/30 backdrop-blur rounded-3xl flex flex-col items-center justify-center cursor-pointer relative hover:bg-white/40 transition-colors shadow-sm">
+                   <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={handleFile} />
+                   {image ? <img src={`data:image/jpeg;base64,${image}`} className="absolute inset-0 w-full h-full object-cover rounded-3xl"/> : <div className="flex flex-col items-center text-white"><Camera size={48} className="mb-2 drop-shadow-md"/><span className="font-bold drop-shadow-md">Scatta Foto</span></div>}
+                </div>
+                <div>
+                    <label className="text-xs font-bold text-white uppercase ml-1 drop-shadow-sm">Note (es. "Senza olio")</label>
+                    <input value={text} onChange={e => setText(e.target.value)} className="w-full p-4 bg-white/95 backdrop-blur rounded-xl mt-1 border border-white/50 shadow-sm focus:ring-2 ring-emerald-500 outline-none" />
+                </div>
+            </div>
+          ) : (
+            <textarea value={text} onChange={e=>setText(e.target.value)} className="w-full h-64 p-4 bg-white/95 backdrop-blur rounded-2xl border border-white/50 shadow-sm focus:ring-2 ring-emerald-500 text-lg placeholder-gray-400 resize-none" placeholder="Es: Pasta al pomodoro e una mela..." />
+          )}
+        </div>
+        
+        <div className="p-4 bg-white/90 backdrop-blur border-t border-gray-200 pb-safe">
+          <div className="flex gap-3">
+            <button onClick={close} className="px-6 py-4 rounded-xl font-bold text-gray-500 bg-gray-100 hover:bg-gray-200 transition-colors">Annulla</button>
+            <button 
+              onClick={analyze} 
+              disabled={loading || (mode==='camera' && !image) || (mode==='text' && !text)} 
+              className="flex-1 bg-emerald-600 text-white py-4 rounded-xl font-bold shadow-lg flex justify-center items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed hover:bg-emerald-700 transition-colors"
+            >
+                {loading ? <Loader2 className="animate-spin"/> : <><ScanLine/> Analizza</>}
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ... UserProfile ...
 function UserProfile({ user, profile, setProfile, setAuthMode }) {
   const [formData, setFormData] = useState(profile);
   const [newWeight, setNewWeight] = useState('');
