@@ -1,11 +1,10 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Camera, Plus, User, PieChart, Calendar, TrendingUp, ScanLine, X, Save, ChevronLeft, Loader2, Scale, CheckCircle2, LogOut, Mail, Lock, Download, AlertTriangle, Edit2 } from 'lucide-react';
+import { Camera, Plus, User, PieChart, Calendar, TrendingUp, ScanLine, X, Save, ChevronLeft, Loader2, Scale, CheckCircle2, LogOut, Mail, Lock, Download, AlertTriangle, Edit2, ChefHat, Sparkles } from 'lucide-react';
 import { initializeApp } from 'firebase/app';
 import { getAuth, signInAnonymously, onAuthStateChanged, signInWithCustomToken, signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut } from 'firebase/auth';
 import { getFirestore, collection, addDoc, query, onSnapshot, deleteDoc, doc, setDoc, getDoc, orderBy, where } from 'firebase/firestore';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer, AreaChart, Area } from 'recharts';
 
-// --- CONFIGURAZIONE FIREBASE ---
 // Your web app's Firebase configuration
 const firebaseConfig = {
   apiKey: "AIzaSyDZp4rC_LYox1YlBW8eDqsycmqH08i4zP8",
@@ -21,8 +20,8 @@ const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
 const db = getFirestore(app);
 
-// FIX: Se l'appId contiene slash (es. percorsi file), usiamo 'default-app-id' per garantire
-// compatibilità con le regole di sicurezza e la configurazione manuale del DB.
+// FIX ID APP: Se l'ID contiene slash (es. percorsi file temporanei), usiamo 'default-app-id'
+// per garantire compatibilità con le regole di sicurezza e la configurazione manuale.
 const rawAppId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
 const appId = rawAppId.includes('/') ? 'default-app-id' : rawAppId;
 
@@ -48,10 +47,25 @@ async function callGemini(prompt, apiKey, imageBase64 = null, jsonMode = true) {
         generationConfig: jsonMode ? { responseMimeType: "application/json" } : {}
       })
     });
-    if (!response.ok) throw new Error("Errore API Gemini");
+    
+    if (!response.ok) throw new Error(`Errore API Gemini: ${response.status}`);
+    
     const data = await response.json();
-    const text = data.candidates?.[0]?.content?.parts?.[0]?.text;
-    return jsonMode ? JSON.parse(text) : text;
+    let text = data.candidates?.[0]?.content?.parts?.[0]?.text;
+    
+    if (!text) return null;
+
+    if (jsonMode) {
+      // FIX: Pulizia della stringa JSON da markdown code blocks
+      text = text.replace(/```json/g, '').replace(/```/g, '').trim();
+      try {
+        return JSON.parse(text);
+      } catch (e) {
+        console.error("Errore parsing JSON:", e, text);
+        return null;
+      }
+    }
+    return text;
   } catch (error) {
     console.error("Errore Gemini:", error);
     return null;
@@ -92,21 +106,19 @@ export default function NutriAIPro() {
       try {
         const profileSnap = await getDoc(doc(db, 'artifacts', appId, 'users', user.uid, 'profile', 'main'));
         if (profileSnap.exists()) setProfile(profileSnap.data());
-      } catch (e) {
-        console.warn("Profilo non trovato o errore accesso:", e);
-      }
+      } catch (e) { console.warn("Info: Profilo non ancora creato o errore accesso."); }
 
-      // Caricamento API Key
+      // Caricamento API Key con gestione errore permessi
       try {
         const keySnap = await getDoc(doc(db, 'artifacts', appId, 'public', 'data', 'config', 'secrets'));
         if (keySnap.exists() && keySnap.data().gemini_key) {
           setApiKey(keySnap.data().gemini_key);
         } else {
-          console.warn(`Chiave non trovata in artifacts/${appId}/public/data/config/secrets`);
+          // Non settiamo errore, lasciamo che l'UI mostri il campo di input
           setApiKey("");
         }
       } catch (e) {
-        console.error("Errore caricamento API Key:", e);
+        console.warn("Impossibile leggere API Key dal DB (Permessi o inesistente). Usa input manuale.");
         setApiKey("");
       }
       
@@ -126,9 +138,24 @@ export default function NutriAIPro() {
     <div className="bg-gray-50 min-h-screen font-sans text-gray-800 pb-24 md:max-w-md md:mx-auto md:shadow-2xl md:min-h-screen md:border-x border-gray-200">
       
       {!apiKey && (
-         <div className="bg-amber-100 p-4 text-xs text-amber-800 text-center">
-           <AlertTriangle size={16} className="inline mr-1"/>
-           Key mancante: Verifica DB in <code>artifacts/{appId}/public/data/config/secrets</code>
+         <div className="bg-amber-50 p-4 text-xs text-amber-900 text-center border-b border-amber-100 animate-in slide-in-from-top">
+           <div className="flex items-center justify-center gap-2 mb-2 font-bold">
+             <AlertTriangle size={16} className="text-amber-600"/>
+             <span>Configurazione API Richiesta</span>
+           </div>
+           <p className="mb-2 opacity-80">Opzione A: Aggiungi documento Firestore in:</p>
+           <code className="block bg-white p-2 rounded border border-amber-200 text-[10px] break-all mb-3 select-all">
+             artifacts/{appId}/public/data/config/secrets
+           </code>
+           <div className="flex justify-center">
+             <input 
+               type="text" 
+               placeholder="Oppure incolla API Key qui..." 
+               className="p-2 w-full max-w-xs rounded border border-amber-300 focus:ring-2 focus:ring-amber-500 outline-none"
+               onKeyDown={(e) => { if(e.key === 'Enter') setApiKey(e.target.value); }}
+               onBlur={(e) => { if(e.target.value) setApiKey(e.target.value); }}
+             />
+           </div>
          </div>
       )}
 
@@ -195,50 +222,31 @@ function AuthScreen({ mode, setMode }) {
 
       <div className="bg-white rounded-3xl p-6 text-gray-800 shadow-xl">
         <h2 className="text-xl font-bold mb-6 text-center">{mode === 'login' ? 'Bentornato' : 'Crea Account'}</h2>
-        
         {error && <div className="bg-red-50 text-red-500 p-3 rounded-xl text-sm mb-4">{error}</div>}
-
         <form onSubmit={handleAuth} className="space-y-4">
           <div className="relative">
             <Mail className="absolute left-3 top-3 text-gray-400" size={20}/>
-            <input 
-              type="email" placeholder="Email" required
-              value={email} onChange={e => setEmail(e.target.value)}
-              className="w-full pl-10 p-3 bg-gray-50 rounded-xl border border-gray-200 focus:border-emerald-500 outline-none" 
-            />
+            <input type="email" placeholder="Email" required value={email} onChange={e => setEmail(e.target.value)} className="w-full pl-10 p-3 bg-gray-50 rounded-xl border border-gray-200 focus:border-emerald-500 outline-none" />
           </div>
           <div className="relative">
             <Lock className="absolute left-3 top-3 text-gray-400" size={20}/>
-            <input 
-              type="password" placeholder="Password" required minLength={6}
-              value={password} onChange={e => setPassword(e.target.value)}
-              className="w-full pl-10 p-3 bg-gray-50 rounded-xl border border-gray-200 focus:border-emerald-500 outline-none" 
-            />
+            <input type="password" placeholder="Password" required minLength={6} value={password} onChange={e => setPassword(e.target.value)} className="w-full pl-10 p-3 bg-gray-50 rounded-xl border border-gray-200 focus:border-emerald-500 outline-none" />
           </div>
-
           <button type="submit" disabled={loading} className="w-full bg-emerald-600 text-white py-3 rounded-xl font-bold hover:bg-emerald-700 transition-colors flex justify-center">
              {loading ? <Loader2 className="animate-spin"/> : (mode === 'login' ? 'Accedi' : 'Registrati')}
           </button>
         </form>
-
         <div className="mt-4 text-center text-sm text-gray-500">
           {mode === 'login' ? "Non hai un account? " : "Hai già un account? "}
-          <button onClick={() => setMode(mode === 'login' ? 'register' : 'login')} className="text-emerald-600 font-bold">
-            {mode === 'login' ? "Registrati" : "Accedi"}
-          </button>
+          <button onClick={() => setMode(mode === 'login' ? 'register' : 'login')} className="text-emerald-600 font-bold">{mode === 'login' ? "Registrati" : "Accedi"}</button>
         </div>
-
         <div className="mt-6 border-t border-gray-100 pt-4 text-center">
-           <button onClick={handleAnonymous} className="text-gray-400 text-xs hover:text-gray-600 underline">
-             Continua come ospite (i dati potrebbero andare persi)
-           </button>
+           <button onClick={handleAnonymous} className="text-gray-400 text-xs hover:text-gray-600 underline">Continua come ospite</button>
         </div>
       </div>
     </div>
   );
 }
-
-// --- SUB COMPONENTS ---
 
 const NavBtn = ({ icon, label, active, onClick }) => (
   <button onClick={onClick} className={`flex flex-col items-center gap-1 ${active ? 'text-emerald-600 font-medium' : 'text-gray-400'}`}>
@@ -247,10 +255,16 @@ const NavBtn = ({ icon, label, active, onClick }) => (
   </button>
 );
 
+// --- 1. DAILY VIEW + NEW RECIPE SUGGESTER ---
 function DailyView({ user, profile, setActiveTab, apiKey }) {
   const [logs, setLogs] = useState([]);
   const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
   
+  // Stati per il Suggeritore Ricette
+  const [ingredients, setIngredients] = useState('');
+  const [suggestedRecipe, setSuggestedRecipe] = useState(null);
+  const [loadingRecipe, setLoadingRecipe] = useState(false);
+
   const bmr = profile.weight ? (10 * profile.weight) + (6.25 * profile.height) - (5 * profile.age) + (profile.gender === 'Uomo' ? 5 : -161) : 2000;
   const targetCals = Math.round(bmr * (profile.goal === 'Dimagrimento' ? 1.1 : profile.goal === 'Aumento Massa' ? 1.4 : 1.2));
 
@@ -266,6 +280,48 @@ function DailyView({ user, profile, setActiveTab, apiKey }) {
     fat: acc.fat + (l.fat || 0)
   }), { cals: 0, prot: 0, carb: 0, fat: 0 });
 
+  const getRecipe = async () => {
+    if(!apiKey) return alert("Manca API Key");
+    if(!ingredients) return alert("Inserisci qualche ingrediente!");
+    
+    setLoadingRecipe(true);
+    setSuggestedRecipe(null);
+    
+    const prompt = `
+      Agisci come un chef nutrizionista. L'utente ha questi ingredienti: "${ingredients}".
+      Il suo obiettivo è: ${profile.goal}.
+      Suggerisci UNA ricetta sana e creativa che usi questi ingredienti (e altri base come olio, sale, spezie).
+      Restituisci JSON: 
+      { 
+        "name": "Nome Ricetta", 
+        "description": "Breve descrizione appetitosa",
+        "calories": 0, "protein": 0, "carbs": 0, "fat": 0,
+        "instructions": "Passaggi brevi per prepararla",
+        "note": "Perché fa bene"
+      }
+    `;
+    
+    const res = await callGemini(prompt, apiKey);
+    if(res) setSuggestedRecipe(res);
+    else alert("Non sono riuscito a creare una ricetta. Riprova con ingredienti diversi.");
+    
+    setLoadingRecipe(false);
+  };
+
+  const addSuggestedMeal = async () => {
+    if(!suggestedRecipe) return;
+    try {
+      await addDoc(collection(db, 'artifacts', appId, 'users', user.uid, 'food_logs'), { 
+          ...suggestedRecipe, 
+          date: date, 
+          timestamp: new Date().toISOString() 
+      });
+      setSuggestedRecipe(null);
+      setIngredients('');
+      alert("Pasto aggiunto al diario!");
+    } catch(e) { alert("Errore salvataggio"); }
+  };
+
   return (
     <div className="p-5 space-y-6">
       <header className="flex justify-between items-center pt-2">
@@ -276,6 +332,7 @@ function DailyView({ user, profile, setActiveTab, apiKey }) {
         <input type="date" value={date} onChange={e => setDate(e.target.value)} className="bg-white border rounded-lg p-2 text-sm" />
       </header>
 
+      {/* Stats Card */}
       <div className="bg-white rounded-3xl p-6 shadow-sm border border-gray-100 relative overflow-hidden">
         <div className="absolute top-0 right-0 w-32 h-32 bg-emerald-50 rounded-full -mr-10 -mt-10 opacity-50 pointer-events-none"></div>
         <div className="flex justify-between items-end mb-4 relative z-10">
@@ -298,6 +355,52 @@ function DailyView({ user, profile, setActiveTab, apiKey }) {
         </div>
       </div>
 
+      {/* NUOVA SEZIONE: CHEF FRIGO */}
+      <div className="bg-orange-50 border border-orange-100 rounded-3xl p-5">
+        <h3 className="font-bold text-orange-900 mb-2 flex items-center gap-2">
+          <ChefHat size={20}/> Cosa cucino con...
+        </h3>
+        {!suggestedRecipe ? (
+          <div className="flex gap-2">
+            <input 
+              value={ingredients}
+              onChange={e => setIngredients(e.target.value)}
+              placeholder="Es. 2 uova, zucchine, riso..."
+              className="flex-1 p-3 rounded-xl border border-orange-200 text-sm focus:ring-2 focus:ring-orange-400 outline-none"
+            />
+            <button 
+              onClick={getRecipe}
+              disabled={loadingRecipe || !ingredients}
+              className="bg-orange-500 text-white p-3 rounded-xl font-bold shadow-md disabled:opacity-50"
+            >
+              {loadingRecipe ? <Loader2 className="animate-spin"/> : <Sparkles size={20}/>}
+            </button>
+          </div>
+        ) : (
+          <div className="bg-white p-4 rounded-2xl shadow-sm animate-in fade-in">
+            <div className="flex justify-between items-start mb-2">
+              <h4 className="font-bold text-lg text-gray-800">{suggestedRecipe.name}</h4>
+              <button onClick={() => setSuggestedRecipe(null)} className="text-gray-400"><X size={16}/></button>
+            </div>
+            <p className="text-xs text-gray-500 mb-3">{suggestedRecipe.description}</p>
+            <div className="flex gap-3 text-xs font-bold text-gray-600 mb-3 bg-gray-50 p-2 rounded-lg">
+              <span>🔥 {suggestedRecipe.calories} kcal</span>
+              <span>P: {suggestedRecipe.protein}g</span>
+              <span>C: {suggestedRecipe.carbs}g</span>
+              <span>G: {suggestedRecipe.fat}g</span>
+            </div>
+            <p className="text-sm text-gray-700 italic mb-4 leading-relaxed">"{suggestedRecipe.instructions}"</p>
+            <button 
+              onClick={addSuggestedMeal}
+              className="w-full bg-orange-100 text-orange-700 py-2 rounded-xl font-bold text-sm hover:bg-orange-200 transition-colors"
+            >
+              Aggiungi a Diario Oggi
+            </button>
+          </div>
+        )}
+      </div>
+
+      {/* Meals List */}
       <div>
         <h2 className="font-bold text-gray-800 mb-3 text-lg">Pasti registrati</h2>
         {logs.length === 0 ? (
@@ -493,25 +596,23 @@ const TooltipCustom = (props) => {
     return null;
 }
 
-// --- NEW COMPONENT: ADD FOOD WITH REVIEW ---
 function AddFood({ user, profile, close, apiKey }) {
   const [mode, setMode] = useState('camera');
   const [image, setImage] = useState(null);
-  const [text, setText] = useState(''); // Usato per testo O per caption foto
+  const [text, setText] = useState('');
   const [loading, setLoading] = useState(false);
-  const [reviewData, setReviewData] = useState(null); // NUOVO STATO PER REVISIONE
+  const [reviewData, setReviewData] = useState(null);
   const fileRef = useRef(null);
 
   const analyze = async () => {
     if(!apiKey) return alert("API Key non trovata!");
     setLoading(true);
     
-    // Prompt migliorato per includere il contesto "text" anche in modalità camera
     let prompt = "";
-    const baseReq = `Restituisci JSON: { "name": "Nome piatto", "calories": numero_kcal, "protein": grammi, "carbs": grammi, "fat": grammi, "note": "Breve commento" }.`;
+    const baseReq = `Rispondi ESCLUSIVAMENTE con un JSON valido (senza markdown) con questa struttura: { "name": "Nome piatto", "calories": numero_kcal, "protein": grammi, "carbs": grammi, "fat": grammi, "note": "Breve commento" }.`;
     
     if (mode === 'camera') {
-        prompt = `Analizza questa immagine di cibo. Contesto utente aggiuntivo: "${text}". Stima valori nutrizionali. ${baseReq}`;
+        prompt = `Analizza questa immagine di cibo. Contesto utente: "${text}". Stima valori nutrizionali. ${baseReq}`;
     } else {
         prompt = `Analizza questo pasto descritto: "${text}". Stima valori nutrizionali. ${baseReq}`;
     }
@@ -520,7 +621,7 @@ function AddFood({ user, profile, close, apiKey }) {
     setLoading(false);
 
     if (res) {
-      setReviewData(res); // Passa alla fase di revisione
+      setReviewData(res);
     } else {
       alert("Impossibile analizzare. Riprova.");
     }
@@ -546,7 +647,6 @@ function AddFood({ user, profile, close, apiKey }) {
     if(e.target.files[0]) reader.readAsDataURL(e.target.files[0]);
   };
 
-  // VISTA REVISIONE (Step 2)
   if (reviewData) {
       return (
           <div className="fixed inset-0 bg-white z-50 p-6 flex flex-col animate-in fade-in slide-in-from-bottom-5">
@@ -554,7 +654,6 @@ function AddFood({ user, profile, close, apiKey }) {
                 <h2 className="text-xl font-bold text-gray-800">Conferma Dati</h2>
                 <button onClick={() => setReviewData(null)} className="text-gray-400"><X/></button>
               </div>
-              
               <div className="flex-1 overflow-y-auto space-y-6 pb-20">
                   <div className="bg-emerald-50 p-4 rounded-xl border border-emerald-100 text-sm text-emerald-800">
                       <div className="flex gap-2 items-start">
@@ -562,108 +661,57 @@ function AddFood({ user, profile, close, apiKey }) {
                         <p>L'AI ha stimato questi valori. Modifica i campi se il calcolo non ti sembra corretto.</p>
                       </div>
                   </div>
-
                   <div>
                       <label className="text-xs font-bold text-gray-400 uppercase ml-1">Cosa mangi?</label>
-                      <input 
-                        value={reviewData.name} 
-                        onChange={e => setReviewData({...reviewData, name: e.target.value})}
-                        className="w-full p-4 bg-gray-50 rounded-xl mt-1 font-bold text-lg text-gray-800 border-none focus:ring-2 ring-emerald-500"
-                      />
+                      <input value={reviewData.name} onChange={e => setReviewData({...reviewData, name: e.target.value})} className="w-full p-4 bg-gray-50 rounded-xl mt-1 font-bold text-lg text-gray-800 border-none focus:ring-2 ring-emerald-500" />
                   </div>
-
                   <div className="grid grid-cols-2 gap-4">
                       <div>
                           <label className="text-xs font-bold text-gray-400 uppercase ml-1">Calorie (kcal)</label>
-                          <input 
-                            type="number" 
-                            value={reviewData.calories} 
-                            onChange={e => setReviewData({...reviewData, calories: Number(e.target.value)})}
-                            className="w-full p-4 bg-gray-50 rounded-xl mt-1 font-bold text-emerald-600 text-xl border-none"
-                          />
+                          <input type="number" value={reviewData.calories} onChange={e => setReviewData({...reviewData, calories: Number(e.target.value)})} className="w-full p-4 bg-gray-50 rounded-xl mt-1 font-bold text-emerald-600 text-xl border-none" />
                       </div>
                       <div className="space-y-3">
-                           <div>
-                               <label className="flex justify-between text-xs font-bold text-gray-500 mb-1">Proteine <span>(g)</span></label>
-                               <input type="number" value={reviewData.protein} onChange={e => setReviewData({...reviewData, protein: Number(e.target.value)})} className="w-full p-2 bg-gray-50 rounded-lg border-none font-bold text-blue-600"/>
-                           </div>
-                           <div>
-                               <label className="flex justify-between text-xs font-bold text-gray-500 mb-1">Carbo <span>(g)</span></label>
-                               <input type="number" value={reviewData.carbs} onChange={e => setReviewData({...reviewData, carbs: Number(e.target.value)})} className="w-full p-2 bg-gray-50 rounded-lg border-none font-bold text-amber-600"/>
-                           </div>
-                           <div>
-                               <label className="flex justify-between text-xs font-bold text-gray-500 mb-1">Grassi <span>(g)</span></label>
-                               <input type="number" value={reviewData.fat} onChange={e => setReviewData({...reviewData, fat: Number(e.target.value)})} className="w-full p-2 bg-gray-50 rounded-lg border-none font-bold text-rose-600"/>
-                           </div>
+                           <div><label className="flex justify-between text-xs font-bold text-gray-500 mb-1">Proteine <span>(g)</span></label><input type="number" value={reviewData.protein} onChange={e => setReviewData({...reviewData, protein: Number(e.target.value)})} className="w-full p-2 bg-gray-50 rounded-lg border-none font-bold text-blue-600"/></div>
+                           <div><label className="flex justify-between text-xs font-bold text-gray-500 mb-1">Carbo <span>(g)</span></label><input type="number" value={reviewData.carbs} onChange={e => setReviewData({...reviewData, carbs: Number(e.target.value)})} className="w-full p-2 bg-gray-50 rounded-lg border-none font-bold text-amber-600"/></div>
+                           <div><label className="flex justify-between text-xs font-bold text-gray-500 mb-1">Grassi <span>(g)</span></label><input type="number" value={reviewData.fat} onChange={e => setReviewData({...reviewData, fat: Number(e.target.value)})} className="w-full p-2 bg-gray-50 rounded-lg border-none font-bold text-rose-600"/></div>
                       </div>
                   </div>
-                  
                   <div>
                       <label className="text-xs font-bold text-gray-400 uppercase ml-1">Note AI</label>
-                      <textarea 
-                        value={reviewData.note} 
-                        onChange={e => setReviewData({...reviewData, note: e.target.value})}
-                        className="w-full p-3 bg-gray-50 rounded-xl mt-1 text-sm text-gray-600 h-20 resize-none border-none"
-                      />
+                      <textarea value={reviewData.note} onChange={e => setReviewData({...reviewData, note: e.target.value})} className="w-full p-3 bg-gray-50 rounded-xl mt-1 text-sm text-gray-600 h-20 resize-none border-none" />
                   </div>
               </div>
-
               <div className="fixed bottom-0 left-0 right-0 p-6 bg-white border-t border-gray-100 flex gap-3 md:absolute md:rounded-b-3xl">
                   <button onClick={() => setReviewData(null)} className="flex-1 py-4 font-bold text-gray-500 bg-gray-100 rounded-xl">Indietro</button>
-                  <button onClick={saveLog} className="flex-[2] py-4 bg-emerald-600 text-white rounded-xl font-bold shadow-xl flex justify-center gap-2 items-center">
-                      <CheckCircle2 size={20}/> Conferma e Salva
-                  </button>
+                  <button onClick={saveLog} className="flex-[2] py-4 bg-emerald-600 text-white rounded-xl font-bold shadow-xl flex justify-center gap-2 items-center"><CheckCircle2 size={20}/> Conferma</button>
               </div>
           </div>
       )
   }
 
-  // VISTA INPUT (Step 1)
   return (
     <div className="fixed inset-0 bg-white z-50 p-6 flex flex-col animate-in slide-in-from-bottom-10">
       <div className="flex justify-between items-center mb-6"><h2 className="text-2xl font-bold">Nuovo Pasto</h2><button onClick={close} className="bg-gray-100 p-2 rounded-full"><X/></button></div>
-      
       <div className="flex bg-gray-100 p-1 rounded-xl mb-6">
         <button onClick={() => setMode('camera')} className={`flex-1 py-3 rounded-lg text-sm font-medium transition-all ${mode==='camera'?'bg-white shadow-sm text-emerald-700':'text-gray-500'}`}>Foto</button>
         <button onClick={() => setMode('text')} className={`flex-1 py-3 rounded-lg text-sm font-medium transition-all ${mode==='text'?'bg-white shadow-sm text-emerald-700':'text-gray-500'}`}>Testo</button>
       </div>
-      
       <div className="flex-1 overflow-y-auto">
         {mode === 'camera' ? (
           <div className="space-y-4">
               <div onClick={() => fileRef.current.click()} className="h-64 border-2 border-dashed border-gray-300 rounded-3xl flex flex-col items-center justify-center bg-gray-50 cursor-pointer overflow-hidden relative hover:bg-gray-100 transition-colors">
                  <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={handleFile} />
-                 {image ? (
-                   <img src={`data:image/jpeg;base64,${image}`} className="absolute inset-0 w-full h-full object-cover"/>
-                 ) : (
-                   <div className="flex flex-col items-center">
-                     <Camera className="text-gray-400 mb-2" size={32}/>
-                     <span className="text-gray-400 font-medium">Tocca per scattare</span>
-                   </div>
-                 )}
+                 {image ? <img src={`data:image/jpeg;base64,${image}`} className="absolute inset-0 w-full h-full object-cover"/> : <div className="flex flex-col items-center"><Camera className="text-gray-400 mb-2" size={32}/><span className="text-gray-400 font-medium">Tocca per scattare</span></div>}
               </div>
-              
-              {/* NUOVO: Input per contesto foto */}
               <div>
                   <label className="text-xs font-bold text-gray-400 uppercase ml-1">Descrizione aggiuntiva (Opzionale)</label>
-                  <input 
-                    value={text} 
-                    onChange={e => setText(e.target.value)} 
-                    placeholder="Es. Senza olio, porzione abbondante..."
-                    className="w-full p-4 bg-gray-50 rounded-xl mt-1 border-none focus:ring-2 ring-emerald-500" 
-                  />
+                  <input value={text} onChange={e => setText(e.target.value)} placeholder="Es. Senza olio, porzione abbondante..." className="w-full p-4 bg-gray-50 rounded-xl mt-1 border-none focus:ring-2 ring-emerald-500" />
               </div>
           </div>
         ) : (
-          <textarea 
-            value={text} 
-            onChange={e=>setText(e.target.value)} 
-            className="w-full h-64 p-4 bg-gray-50 rounded-2xl resize-none border-none focus:ring-2 ring-emerald-500 text-lg" 
-            placeholder="Descrivi il pasto in dettaglio... Es: 2 uova strapazzate con 1 fetta di pane tostato e un caffè." 
-          />
+          <textarea value={text} onChange={e=>setText(e.target.value)} className="w-full h-64 p-4 bg-gray-50 rounded-2xl resize-none border-none focus:ring-2 ring-emerald-500 text-lg" placeholder="Descrivi il pasto in dettaglio... Es: 2 uova strapazzate con 1 fetta di pane tostato e un caffè." />
         )}
       </div>
-      
       <button onClick={analyze} disabled={loading || (mode==='camera' && !image) || (mode==='text' && !text)} className="w-full bg-emerald-600 text-white py-4 rounded-xl font-bold shadow-xl flex justify-center items-center gap-2 mt-4 disabled:opacity-50 disabled:cursor-not-allowed">
           {loading ? <Loader2 className="animate-spin"/> : <><ScanLine/> Analizza con AI</>}
       </button>
@@ -685,9 +733,7 @@ function UserProfile({ user, profile, setProfile, setAuthMode }) {
   const handleInstall = () => {
     if(!installPrompt) return;
     installPrompt.prompt();
-    installPrompt.userChoice.then((result) => {
-        if(result.outcome === 'accepted') setInstallPrompt(null);
-    });
+    installPrompt.userChoice.then((result) => { if(result.outcome === 'accepted') setInstallPrompt(null); });
   };
 
   const save = async () => { await setDoc(doc(db, 'artifacts', appId, 'users', user.uid, 'profile', 'main'), formData); setProfile(formData); alert("Salvato!"); };
@@ -700,17 +746,12 @@ function UserProfile({ user, profile, setProfile, setAuthMode }) {
           <h1 className="text-2xl font-bold">Profilo</h1>
           <button onClick={handleLogout} className="text-red-500 bg-red-50 p-2 rounded-full"><LogOut size={20}/></button>
       </div>
-
       {installPrompt && (
         <div className="bg-emerald-600 text-white p-4 rounded-2xl mb-6 flex justify-between items-center shadow-lg">
-           <div>
-             <div className="font-bold">Installa App</div>
-             <div className="text-xs opacity-90">Aggiungi alla home per accesso rapido</div>
-           </div>
+           <div><div className="font-bold">Installa App</div><div className="text-xs opacity-90">Aggiungi alla home per accesso rapido</div></div>
            <button onClick={handleInstall} className="bg-white text-emerald-600 px-4 py-2 rounded-xl font-bold text-sm flex items-center gap-2"><Download size={16}/> Installa</button>
         </div>
       )}
-
       <div className="space-y-4 mb-8">
         <div className="grid grid-cols-2 gap-4">
           <Input label="Età" val={formData.age} onChange={v => setFormData({...formData, age: v})} />
