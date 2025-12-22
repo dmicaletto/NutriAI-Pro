@@ -6,7 +6,17 @@ import { getFirestore, collection, addDoc, query, onSnapshot, deleteDoc, doc, se
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer, AreaChart, Area } from 'recharts';
 
 // --- CONFIGURAZIONE FIREBASE ---
-const firebaseConfig = JSON.parse(__firebase_config);
+// Your web app's Firebase configuration
+const firebaseConfig = {
+  apiKey: "AIzaSyDZp4rC_LYox1YlBW8eDqsycmqH08i4zP8",
+  authDomain: "nutriai-f081c.firebaseapp.com",
+  projectId: "nutriai-f081c",
+  storageBucket: "nutriai-f081c.firebasestorage.app",
+  messagingSenderId: "841982374698",
+  appId: "1:841982374698:web:0289d0aac7d926b07ce453"
+};
+
+// Initialize Firebase
 const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
 const db = getFirestore(app);
