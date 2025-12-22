@@ -15,7 +15,7 @@ const firebaseConfig = {
   appId: "1:841982374698:web:0289d0aac7d926b07ce453"
 };
 
-// Initialize Firebase
+// Initialize Firebase;
 const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
 const db = getFirestore(app);
@@ -139,6 +139,15 @@ export default function NutriAIPro() {
     loadData();
   }, [user]);
 
+  // 3. Gestione Aggiornamenti Service Worker (per evitare schermata bianca)
+  useEffect(() => {
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.addEventListener('controllerchange', () => {
+        window.location.reload();
+      });
+    }
+  }, []);
+
   if (!user && (authMode === 'login' || authMode === 'register')) {
     return <AuthScreen mode={authMode} setMode={setAuthMode} />;
   }
@@ -177,11 +186,13 @@ export default function NutriAIPro() {
           {activeTab === 'daily' && <DailyView user={user} profile={profile} setActiveTab={setActiveTab} apiKey={apiKey} />}
           {activeTab === 'planner' && <WeeklyPlanner user={user} profile={profile} apiKey={apiKey} />}
           {activeTab === 'trends' && <TrendsAnalytics user={user} />}
-          {/* AddFood is rendered as a modal, so it handles its own z-index */}
-          {activeTab === 'add' && <AddFood user={user} profile={profile} close={() => setActiveTab('daily')} apiKey={apiKey} />}
+          {/* AddFood Rimosso da qui e spostato fuori per risolvere i problemi di z-index */}
           {activeTab === 'profile' && <UserProfile user={user} profile={profile} setProfile={setProfile} setAuthMode={setAuthMode} />}
         </div>
       </div>
+
+      {/* MODALI A LIVELLO ROOT (Per z-index corretto sopra la bottom bar) */}
+      {activeTab === 'add' && <AddFood user={user} profile={profile} close={() => setActiveTab('daily')} apiKey={apiKey} />}
 
       {/* BOTTOM NAV (Fixed) */}
       <div className="fixed bottom-0 left-0 right-0 md:w-full md:max-w-md md:mx-auto bg-white/95 backdrop-blur-md border-t border-gray-200 px-6 py-3 flex justify-between items-end z-50 pb-safe shadow-lg-up rounded-t-3xl">
@@ -202,7 +213,7 @@ export default function NutriAIPro() {
   );
 }
 
-// --- AUTH SCREEN ---
+// ... AUTH SCREEN (Invariato) ...
 function AuthScreen({ mode, setMode }) {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -268,8 +279,7 @@ const NavBtn = ({ icon, label, active, onClick }) => (
   </button>
 );
 
-// --- VIEW COMPONENTS (Aggiornati per card style) ---
-
+// ... VIEW COMPONENTS (DailyView, Trends, ecc. invariati salvo dove richiamano AddFood) ...
 function DailyView({ user, profile, setActiveTab, apiKey }) {
   const [logs, setLogs] = useState([]);
   const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
@@ -439,35 +449,40 @@ function AddFood({ user, profile, close, apiKey }) {
   // VISTA REVISIONE (Step 2)
   if (reviewData) {
       return (
-          <div className="fixed inset-0 z-[60] bg-gray-50 flex flex-col animate-in slide-in-from-right">
-              <div className="bg-white p-4 shadow-sm flex items-center justify-between pt-safe-top">
-                <button onClick={() => setReviewData(null)} className="p-2 bg-gray-100 rounded-full"><ChevronLeft/></button>
-                <h2 className="font-bold text-lg">Conferma</h2>
-                <div className="w-10"></div>
-              </div>
-              
-              <div className="flex-1 overflow-y-auto p-6 space-y-6 pb-32">
-                  <div className="bg-emerald-100 p-4 rounded-xl text-emerald-800 text-sm flex gap-3 items-center">
-                    <Sparkles className="shrink-0"/>
-                    <p>Ho stimato questi valori. Correggili se necessario.</p>
-                  </div>
-                  <div>
-                      <label className="text-xs font-bold text-gray-400 uppercase">Pasto</label>
-                      <input value={reviewData.name} onChange={e => setReviewData({...reviewData, name: e.target.value})} className="w-full p-4 bg-white rounded-xl mt-1 font-bold text-lg shadow-sm border border-gray-100" />
-                  </div>
-                  <div className="grid grid-cols-2 gap-4">
-                      <div><label className="text-xs font-bold text-gray-400 uppercase">Kcal</label><input type="number" value={reviewData.calories} onChange={e => setReviewData({...reviewData, calories: Number(e.target.value)})} className="w-full p-4 bg-white rounded-xl mt-1 font-bold text-emerald-600 text-xl shadow-sm" /></div>
-                      <div className="space-y-2">
-                           <div className="bg-white p-2 rounded-lg shadow-sm flex justify-between text-sm"><span>Prot</span><input type="number" value={reviewData.protein} onChange={e => setReviewData({...reviewData, protein: Number(e.target.value)})} className="w-12 text-right font-bold text-blue-600 outline-none"/></div>
-                           <div className="bg-white p-2 rounded-lg shadow-sm flex justify-between text-sm"><span>Carb</span><input type="number" value={reviewData.carbs} onChange={e => setReviewData({...reviewData, carbs: Number(e.target.value)})} className="w-12 text-right font-bold text-amber-600 outline-none"/></div>
-                           <div className="bg-white p-2 rounded-lg shadow-sm flex justify-between text-sm"><span>Gras</span><input type="number" value={reviewData.fat} onChange={e => setReviewData({...reviewData, fat: Number(e.target.value)})} className="w-12 text-right font-bold text-rose-600 outline-none"/></div>
-                      </div>
-                  </div>
-              </div>
+          <div className="fixed inset-0 z-[60] bg-gray-50 flex flex-col h-[100dvh]">
+              <BackgroundPattern />
+              <div className="relative z-10 flex flex-col h-full">
+                <div className="bg-white/90 backdrop-blur p-4 shadow-sm flex items-center justify-between pt-safe-top border-b border-gray-200">
+                  <button onClick={() => setReviewData(null)} className="p-2 bg-gray-100 rounded-full"><ChevronLeft/></button>
+                  <h2 className="font-bold text-lg">Conferma Dati</h2>
+                  <div className="w-10"></div>
+                </div>
+                
+                <div className="flex-1 overflow-y-auto p-6 space-y-6 pb-24">
+                    <div className="bg-white/90 backdrop-blur p-4 rounded-xl text-emerald-800 text-sm flex gap-3 items-center shadow-sm">
+                      <Sparkles className="shrink-0 text-emerald-600"/>
+                      <p>Ho stimato questi valori. Correggili se necessario.</p>
+                    </div>
+                    <div>
+                        <label className="text-xs font-bold text-white uppercase ml-1">Pasto</label>
+                        <input value={reviewData.name} onChange={e => setReviewData({...reviewData, name: e.target.value})} className="w-full p-4 bg-white/95 backdrop-blur rounded-xl mt-1 font-bold text-lg shadow-sm border border-white/50" />
+                    </div>
+                    <div className="grid grid-cols-2 gap-4">
+                        <div><label className="text-xs font-bold text-white uppercase ml-1">Kcal</label><input type="number" value={reviewData.calories} onChange={e => setReviewData({...reviewData, calories: Number(e.target.value)})} className="w-full p-4 bg-white/95 backdrop-blur rounded-xl mt-1 font-bold text-emerald-600 text-xl shadow-sm border border-white/50" /></div>
+                        <div className="space-y-2">
+                             <div className="bg-white/95 backdrop-blur p-2 rounded-lg shadow-sm flex justify-between text-sm"><span>Prot</span><input type="number" value={reviewData.protein} onChange={e => setReviewData({...reviewData, protein: Number(e.target.value)})} className="w-12 text-right font-bold text-blue-600 outline-none bg-transparent"/></div>
+                             <div className="bg-white/95 backdrop-blur p-2 rounded-lg shadow-sm flex justify-between text-sm"><span>Carb</span><input type="number" value={reviewData.carbs} onChange={e => setReviewData({...reviewData, carbs: Number(e.target.value)})} className="w-12 text-right font-bold text-amber-600 outline-none bg-transparent"/></div>
+                             <div className="bg-white/95 backdrop-blur p-2 rounded-lg shadow-sm flex justify-between text-sm"><span>Gras</span><input type="number" value={reviewData.fat} onChange={e => setReviewData({...reviewData, fat: Number(e.target.value)})} className="w-12 text-right font-bold text-rose-600 outline-none bg-transparent"/></div>
+                        </div>
+                    </div>
+                </div>
 
-              <div className="fixed bottom-0 left-0 right-0 p-4 bg-white border-t border-gray-100 flex gap-3 pb-safe">
-                  <button onClick={() => setReviewData(null)} className="flex-1 py-4 font-bold text-gray-500 bg-gray-100 rounded-xl">Annulla</button>
-                  <button onClick={saveLog} className="flex-[2] py-4 bg-emerald-600 text-white rounded-xl font-bold shadow-lg flex justify-center gap-2 items-center"><CheckCircle2/> Salva</button>
+                <div className="p-4 bg-white/90 backdrop-blur border-t border-gray-200 pb-safe">
+                    <div className="flex gap-3">
+                      <button onClick={() => setReviewData(null)} className="flex-1 py-4 font-bold text-gray-500 bg-gray-100 rounded-xl">Annulla</button>
+                      <button onClick={saveLog} className="flex-[2] py-4 bg-emerald-600 text-white rounded-xl font-bold shadow-lg flex justify-center gap-2 items-center"><CheckCircle2/> Salva</button>
+                    </div>
+                </div>
               </div>
           </div>
       )
@@ -475,52 +490,55 @@ function AddFood({ user, profile, close, apiKey }) {
 
   // VISTA INPUT (Step 1)
   return (
-    <div className="fixed inset-0 z-[60] bg-gray-50 flex flex-col animate-in slide-in-from-bottom">
-      <div className="bg-emerald-600 p-4 pt-safe-top text-white flex justify-between items-center shadow-md">
-        <h2 className="text-xl font-bold">Nuovo Pasto</h2>
-        <button onClick={close} className="bg-white/20 p-2 rounded-full hover:bg-white/30"><X/></button>
-      </div>
-      
-      <div className="flex-1 flex flex-col p-4 overflow-y-auto">
-        <div className="bg-white p-1 rounded-xl shadow-sm mb-6 flex">
-          <button onClick={() => setMode('camera')} className={`flex-1 py-2 rounded-lg text-sm font-bold transition-all ${mode==='camera'?'bg-emerald-100 text-emerald-700 shadow-sm':'text-gray-400'}`}>Foto</button>
-          <button onClick={() => setMode('text')} className={`flex-1 py-2 rounded-lg text-sm font-bold transition-all ${mode==='text'?'bg-emerald-100 text-emerald-700 shadow-sm':'text-gray-400'}`}>Testo</button>
+    <div className="fixed inset-0 z-[60] bg-gray-50 flex flex-col h-[100dvh]">
+      <BackgroundPattern />
+      <div className="relative z-10 flex flex-col h-full">
+        <div className="bg-white/90 backdrop-blur p-4 pt-safe-top flex justify-between items-center shadow-sm border-b border-gray-200">
+          <h2 className="text-xl font-bold text-gray-800">Nuovo Pasto</h2>
+          <button onClick={close} className="bg-gray-100 p-2 rounded-full hover:bg-gray-200"><X size={20}/></button>
         </div>
         
-        {mode === 'camera' ? (
-          <div className="space-y-4">
-              <div onClick={() => fileRef.current.click()} className="h-64 border-2 border-dashed border-gray-300 rounded-3xl flex flex-col items-center justify-center bg-white cursor-pointer relative hover:border-emerald-400 transition-colors shadow-sm">
-                 <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={handleFile} />
-                 {image ? <img src={`data:image/jpeg;base64,${image}`} className="absolute inset-0 w-full h-full object-cover rounded-3xl"/> : <div className="flex flex-col items-center text-gray-400"><Camera size={48} className="mb-2"/><span className="font-bold">Scatta Foto</span></div>}
-              </div>
-              <div>
-                  <label className="text-xs font-bold text-gray-400 uppercase ml-1">Note (es. "Senza olio")</label>
-                  <input value={text} onChange={e => setText(e.target.value)} className="w-full p-4 bg-white rounded-xl mt-1 border border-gray-100 shadow-sm focus:ring-2 ring-emerald-500 outline-none" />
-              </div>
+        <div className="flex-1 flex flex-col p-4 overflow-y-auto pb-24">
+          <div className="bg-white/90 backdrop-blur p-1 rounded-xl shadow-sm mb-6 flex border border-white/50">
+            <button onClick={() => setMode('camera')} className={`flex-1 py-2 rounded-lg text-sm font-bold transition-all ${mode==='camera'?'bg-emerald-100 text-emerald-700 shadow-sm':'text-gray-400'}`}>Foto</button>
+            <button onClick={() => setMode('text')} className={`flex-1 py-2 rounded-lg text-sm font-bold transition-all ${mode==='text'?'bg-emerald-100 text-emerald-700 shadow-sm':'text-gray-400'}`}>Testo</button>
           </div>
-        ) : (
-          <textarea value={text} onChange={e=>setText(e.target.value)} className="w-full h-64 p-4 bg-white rounded-2xl border-none shadow-sm focus:ring-2 ring-emerald-500 text-lg placeholder-gray-300 resize-none" placeholder="Es: Pasta al pomodoro e una mela..." />
-        )}
-      </div>
-      
-      {/* BARRA AZIONI FISSA IN BASSO */}
-      <div className="p-4 bg-white border-t border-gray-100 pb-safe">
-        <div className="flex gap-3">
-          <button onClick={close} className="px-6 py-4 rounded-xl font-bold text-gray-500 bg-gray-100 hover:bg-gray-200 transition-colors">Indietro</button>
-          <button 
-            onClick={analyze} 
-            disabled={loading || (mode==='camera' && !image) || (mode==='text' && !text)} 
-            className="flex-1 bg-emerald-600 text-white py-4 rounded-xl font-bold shadow-lg flex justify-center items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed hover:bg-emerald-700 transition-colors"
-          >
-              {loading ? <Loader2 className="animate-spin"/> : <><ScanLine/> Analizza</>}
-          </button>
+          
+          {mode === 'camera' ? (
+            <div className="space-y-4">
+                <div onClick={() => fileRef.current.click()} className="h-64 border-2 border-dashed border-white/60 bg-white/30 backdrop-blur rounded-3xl flex flex-col items-center justify-center cursor-pointer relative hover:bg-white/40 transition-colors shadow-sm">
+                   <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={handleFile} />
+                   {image ? <img src={`data:image/jpeg;base64,${image}`} className="absolute inset-0 w-full h-full object-cover rounded-3xl"/> : <div className="flex flex-col items-center text-white"><Camera size={48} className="mb-2 drop-shadow-md"/><span className="font-bold drop-shadow-md">Scatta Foto</span></div>}
+                </div>
+                <div>
+                    <label className="text-xs font-bold text-white uppercase ml-1 drop-shadow-sm">Note (es. "Senza olio")</label>
+                    <input value={text} onChange={e => setText(e.target.value)} className="w-full p-4 bg-white/95 backdrop-blur rounded-xl mt-1 border border-white/50 shadow-sm focus:ring-2 ring-emerald-500 outline-none" />
+                </div>
+            </div>
+          ) : (
+            <textarea value={text} onChange={e=>setText(e.target.value)} className="w-full h-64 p-4 bg-white/95 backdrop-blur rounded-2xl border border-white/50 shadow-sm focus:ring-2 ring-emerald-500 text-lg placeholder-gray-400 resize-none" placeholder="Es: Pasta al pomodoro e una mela..." />
+          )}
+        </div>
+        
+        {/* BARRA AZIONI FISSA IN BASSO */}
+        <div className="p-4 bg-white/90 backdrop-blur border-t border-gray-200 pb-safe">
+          <div className="flex gap-3">
+            <button onClick={close} className="px-6 py-4 rounded-xl font-bold text-gray-500 bg-gray-100 hover:bg-gray-200 transition-colors">Annulla</button>
+            <button 
+              onClick={analyze} 
+              disabled={loading || (mode==='camera' && !image) || (mode==='text' && !text)} 
+              className="flex-1 bg-emerald-600 text-white py-4 rounded-xl font-bold shadow-lg flex justify-center items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed hover:bg-emerald-700 transition-colors"
+            >
+                {loading ? <Loader2 className="animate-spin"/> : <><ScanLine/> Analizza</>}
+            </button>
+          </div>
         </div>
       </div>
     </div>
   );
 }
 
-// ... WeeklyPlanner, TrendsAnalytics, UserProfile (con stile aggiornato per coerenza) ...
+// ... WeeklyPlanner, TrendsAnalytics, UserProfile (Invariati) ...
 function WeeklyPlanner({ user, profile, apiKey }) {
   const [weekPlan, setWeekPlan] = useState(null);
   const [showWizard, setShowWizard] = useState(false);
