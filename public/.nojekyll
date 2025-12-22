@@ -1,1 +1,4 @@
 
+Questo file dice a GitHub Pages di non processare il sito con Jekyll.
+
+È fondamentale per far funzionare correttamente il routing e gli asset di Vite/React.
