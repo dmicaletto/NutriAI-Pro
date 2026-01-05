@@ -8,6 +8,8 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
     steps:
       - name: Checkout source
         uses: actions/checkout@v4
@@ -26,17 +28,31 @@ jobs:
       - name: Install Dependencies
         run: npm install
 
+      # Installa Capacitor se non è già nel package.json (Sicurezza)
+      - name: Ensure Capacitor CLI
+        run: npm install @capacitor/core @capacitor/cli @capacitor/android
+
       - name: Build Web App
         run: npm run build
 
-      - name: Setup Android Platform
+      # Inizializza Capacitor se non presente (necessario per la prima build in CI)
+      - name: Init Capacitor (if needed)
+        run: |
+          if [ ! -f "capacitor.config.json" ] && [ ! -f "capacitor.config.ts" ]; then
+            npx cap init NutriAI com.nutriai.app --web-dir dist
+          fi
+
+      - name: Add Android Platform
         run: |
           npx cap add android
-          cd android
-          chmod +x gradlew
+          # Sincronizza i file della build web dentro la cartella android
+          npx cap sync android
 
       - name: Build APK
-        run: cd android && ./gradlew assembleDebug
+        run: |
+          cd android
+          chmod +x gradlew
+          ./gradlew assembleDebug
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
