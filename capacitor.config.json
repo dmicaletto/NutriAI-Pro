@@ -1,6 +1,6 @@
 {
-  "appId": "com.rifugio.incantato",
-  "appName": "Il Rifugio Incantato",
+  "appId": "com.nutriai.pro",
+  "appName": "Personal Nutritionist Pro",
   "webDir": "dist",
   "server": {
     "androidScheme": "https"
