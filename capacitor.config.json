@@ -1,0 +1,13 @@
+{
+  "appId": "com.rifugio.incantato",
+  "appName": "Il Rifugio Incantato",
+  "webDir": "dist",
+  "server": {
+    "androidScheme": "https"
+  },
+  "plugins": {
+    "SplashScreen": {
+      "launchShowDuration": 0
+    }
+  }
+}
