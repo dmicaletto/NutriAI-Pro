@@ -22,7 +22,7 @@ jobs:
       - name: Setup Java
         uses: actions/setup-java@v4
         with:
-          distribution: 'zulu'
+          distribution: 'temurin' # Cambiato in temurin per maggiore stabilità
           java-version: '17'
 
       - name: Install Dependencies
@@ -35,7 +35,7 @@ jobs:
       - name: Build Web App
         run: npm run build
 
-      # Inizializza Capacitor se non presente (necessario per la prima build in CI)
+      # Inizializza Capacitor se non presente
       - name: Init Capacitor (if needed)
         run: |
           if [ ! -f "capacitor.config.json" ] && [ ! -f "capacitor.config.ts" ]; then
@@ -44,28 +44,39 @@ jobs:
 
       - name: Add Android Platform
         run: |
-          npx cap add android
-          # Sincronizza i file della build web dentro la cartella android
-          npx cap sync android
+          # Se la cartella android non esiste, la crea. Altrimenti sincronizza.
+          if [ ! -d "android" ]; then
+            npx cap add android
+          else
+            npx cap sync android
+          fi
 
       # --- STEP AGGIUNTO PER FIREBASE ---
-      # Crea il file google-services.json dai segreti di GitHub per configurare le notifiche
       - name: Create google-services.json
         env:
           GOOGLE_SERVICES_JSON: ${{ secrets.GOOGLE_SERVICES_JSON }}
         run: |
           if [ -n "$GOOGLE_SERVICES_JSON" ]; then
             echo "$GOOGLE_SERVICES_JSON" > android/app/google-services.json
-            echo "google-services.json creato con successo."
+            echo "✅ google-services.json creato correttamente dal segreto."
           else
-            echo "Attenzione: Segreto GOOGLE_SERVICES_JSON non trovato."
+            echo "⚠️ ATTENZIONE: Segreto GOOGLE_SERVICES_JSON non trovato!"
+            echo "Creazione di un file google-services.json fittizio per permettere la build..."
+            echo '{"project_info":{"project_number":"000000000000","project_id":"dummy-project","storage_bucket":"dummy-bucket"},"client":[{"client_info":{"mobilesdk_app_id":"1:000000000000:android:000000000000","android_client_info":{"package_name":"com.nutriai.app"}},"api_key":[{"current_key":"dummy-key"}]}]}' > android/app/google-services.json
           fi
+
+      # Setup Gradle Action per gestire meglio la cache e i daemon
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v3
+        with:
+          build-root-directory: android
 
       - name: Build APK
         run: |
           cd android
           chmod +x gradlew
-          ./gradlew assembleDebug
+          # Aggiunto --refresh-dependencies per risolvere errori 403/corruzione cache
+          ./gradlew assembleDebug --refresh-dependencies
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
