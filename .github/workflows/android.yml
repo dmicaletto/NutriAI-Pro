@@ -3,6 +3,9 @@ name: Build Android APK
 on:
   push:
     branches: [ "main" ]
+    # Attiva il workflow quando viene pushato un tag che inizia con 'v' (es. v1.0.0)
+    tags:
+      - 'v*'
   workflow_dispatch:
 
 jobs:
@@ -19,53 +22,100 @@ jobs:
         with:
           node-version: 20
 
+      # Java 21 per compatibilità con le ultime versioni di Android/Gradle
       - name: Setup Java
         uses: actions/setup-java@v4
         with:
-          distribution: 'temurin' # Cambiato in temurin per maggiore stabilità
-          java-version: '17'
+          distribution: 'temurin'
+          java-version: '21'
+
+      # Estrae il nome della versione dal tag (es. refs/tags/v1.0.0 -> 1.0.0)
+      # Se non è un tag (es. push su main), usa "debug"
+      - name: Extract Version
+        id: version
+        run: |
+          if [[ $GITHUB_REF == refs/tags/* ]]; then
+            VERSION=${GITHUB_REF#refs/tags/v}
+            echo "VERSION=$VERSION" >> $GITHUB_ENV
+            echo "IS_RELEASE=true" >> $GITHUB_ENV
+          else
+            echo "VERSION=debug" >> $GITHUB_ENV
+            echo "IS_RELEASE=false" >> $GITHUB_ENV
+          fi
+          echo "Build Version: $VERSION"
 
       - name: Install Dependencies
         run: npm install
 
-      # Installa Capacitor se non è già nel package.json (Sicurezza)
       - name: Ensure Capacitor CLI
         run: npm install @capacitor/core @capacitor/cli @capacitor/android
 
       - name: Build Web App
         run: npm run build
 
-      # Inizializza Capacitor se non presente
       - name: Init Capacitor (if needed)
         run: |
           if [ ! -f "capacitor.config.json" ] && [ ! -f "capacitor.config.ts" ]; then
-            npx cap init NutriAI com.nutriai.app --web-dir dist
+            npx cap init NutriAI com.dmicaletto.trainerpro --web-dir dist
           fi
 
-      - name: Add Android Platform
+      - name: Add/Sync Android Platform
         run: |
-          # Se la cartella android non esiste, la crea. Altrimenti sincronizza.
           if [ ! -d "android" ]; then
             npx cap add android
           else
             npx cap sync android
           fi
 
-      # --- STEP AGGIUNTO PER FIREBASE ---
+      # --- INIEZIONE VERSIONE IN GRADLE ---
+      # Aggiorna versionName con il tag (es. 1.0.0) e versionCode con il numero della build GitHub
+      - name: Bump Android Version
+        if: env.IS_RELEASE == 'true'
+        run: |
+          cd android/app
+          # Aggiorna versionName
+          sed -i "s/versionName \".*\"/versionName \"${{ env.VERSION }}\"/" build.gradle
+          # Aggiorna versionCode (usa il run_number di GitHub Actions che è incrementale)
+          sed -i "s/versionCode .*/versionCode ${{ github.run_number }}/" build.gradle
+          echo "Versione aggiornata in build.gradle: ${{ env.VERSION }} (Code: ${{ github.run_number }})"
+
+      # --- FIX PER ERRORI DUPLICATE CLASSES ---
+      - name: Apply Kotlin Duplicate Classes Fix
+        run: |
+          cd android
+          echo "" >> build.gradle
+          echo "configurations.all {" >> build.gradle
+          echo "    resolutionStrategy.eachDependency { details ->" >> build.gradle
+          echo "        if (details.requested.group == 'org.jetbrains.kotlin' && details.requested.name.startsWith('kotlin-stdlib')) {" >> build.gradle
+          echo "            details.useVersion '1.8.22'" >> build.gradle
+          echo "        }" >> build.gradle
+          echo "    }" >> build.gradle
+          echo "}" >> build.gradle
+          
+          echo "" >> app/build.gradle
+          echo "dependencies {" >> app/build.gradle
+          echo "    modules {" >> app/build.gradle
+          echo "        module(\"org.jetbrains.kotlin:kotlin-stdlib-jdk7\") {" >> app/build.gradle
+          echo "            replacedBy(\"org.jetbrains.kotlin:kotlin-stdlib\", \"kotlin-stdlib-jdk7 is now part of kotlin-stdlib\")" >> app/build.gradle
+          echo "        }" >> app/build.gradle
+          echo "        module(\"org.jetbrains.kotlin:kotlin-stdlib-jdk8\") {" >> app/build.gradle
+          echo "            replacedBy(\"org.jetbrains.kotlin:kotlin-stdlib\", \"kotlin-stdlib-jdk8 is now part of kotlin-stdlib\")" >> app/build.gradle
+          echo "        }" >> app/build.gradle
+          echo "    }" >> app/build.gradle
+          echo "}" >> app/build.gradle
+
       - name: Create google-services.json
         env:
           GOOGLE_SERVICES_JSON: ${{ secrets.GOOGLE_SERVICES_JSON }}
         run: |
           if [ -n "$GOOGLE_SERVICES_JSON" ]; then
             echo "$GOOGLE_SERVICES_JSON" > android/app/google-services.json
-            echo "✅ google-services.json creato correttamente dal segreto."
+            echo "✅ google-services.json creato."
           else
-            echo "⚠️ ATTENZIONE: Segreto GOOGLE_SERVICES_JSON non trovato!"
-            echo "Creazione di un file google-services.json fittizio per permettere la build..."
-            echo '{"project_info":{"project_number":"000000000000","project_id":"dummy-project","storage_bucket":"dummy-bucket"},"client":[{"client_info":{"mobilesdk_app_id":"1:000000000000:android:000000000000","android_client_info":{"package_name":"com.nutriai.app"}},"api_key":[{"current_key":"dummy-key"}]}]}' > android/app/google-services.json
+            echo "⚠️ Segreto mancante. Creazione dummy file."
+            echo '{"project_info":{"project_number":"000000000000","project_id":"dummy","storage_bucket":"dummy"},"client":[{"client_info":{"mobilesdk_app_id":"1:000000000000:android:000000000000","android_client_info":{"package_name":"com.dmicaletto.trainerpro"}},"api_key":[{"current_key":"dummy"}]}]}' > android/app/google-services.json
           fi
 
-      # Setup Gradle Action per gestire meglio la cache e i daemon
       - name: Setup Gradle
         uses: gradle/actions/setup-gradle@v3
         with:
@@ -75,11 +125,11 @@ jobs:
         run: |
           cd android
           chmod +x gradlew
-          # Aggiunto --refresh-dependencies per risolvere errori 403/corruzione cache
           ./gradlew assembleDebug --refresh-dependencies
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: NutriAI-App-Debug
+          # Il nome dell'artifact includerà la versione (es. TrainerPro-v1.0.0)
+          name: TrainerPro-${{ env.VERSION }}
           path: android/app/build/outputs/apk/debug/app-debug.apk
