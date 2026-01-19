@@ -27,7 +27,7 @@ jobs:
         uses: actions/setup-java@v4
         with:
           distribution: 'temurin'
-          java-version: '21'
+          java-version: '17'
 
       # Estrae il nome della versione dal tag (es. refs/tags/v1.0.0 -> 1.0.0)
       # Se non è un tag (es. push su main), usa "debug"
