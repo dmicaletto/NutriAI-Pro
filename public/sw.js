@@ -20,6 +20,12 @@ self.addEventListener('install', (event) => {
 
 // Intercettazione richieste (necessario per PWA)
 self.addEventListener('fetch', (event) => {
+  // 1. Ignora le richieste che non sono GET (es. POST alla Gemini API)
+  if (event.request.method !== 'GET') return;
+
+  // 2. Ignora le richieste ad API esterne
+  if (!event.request.url.startsWith(self.location.origin)) return;
+
   event.respondWith(
     caches.match(event.request)
       .then((response) => {

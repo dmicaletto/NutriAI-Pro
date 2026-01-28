@@ -30,7 +30,7 @@ async function callGemini(prompt, apiKey, imageBase64 = null, jsonMode = true) {
     console.error("API Key mancante");
     return null;
   }
-  
+
   const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=${apiKey}`;
   const contents = [{
     role: "user",
@@ -46,12 +46,12 @@ async function callGemini(prompt, apiKey, imageBase64 = null, jsonMode = true) {
         generationConfig: jsonMode ? { responseMimeType: "application/json" } : {}
       })
     });
-    
+
     if (!response.ok) throw new Error(`Errore API Gemini: ${response.status}`);
-    
+
     const data = await response.json();
     let text = data.candidates?.[0]?.content?.parts?.[0]?.text;
-    
+
     if (!text) return null;
 
     if (jsonMode) {
@@ -99,9 +99,9 @@ export default function NutriAIPro() {
   // 1. Init Auth Listener
   useEffect(() => {
     const init = async () => {
-        if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
-            await signInWithCustomToken(auth, __initial_auth_token);
-        } 
+      if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
+        await signInWithCustomToken(auth, __initial_auth_token);
+      }
     };
     init();
     return onAuthStateChanged(auth, (u) => {
@@ -113,7 +113,7 @@ export default function NutriAIPro() {
   // 2. Fetch Profile & API Key
   useEffect(() => {
     if (!user) return;
-    
+
     const loadData = async () => {
       setLoadingKey(true);
       try {
@@ -122,14 +122,19 @@ export default function NutriAIPro() {
       } catch (e) { console.warn(e); }
 
       try {
-        const keySnap = await getDoc(doc(db, 'artifacts', appId, 'public', 'data', 'config', 'secrets'));
-        if (keySnap.exists() && keySnap.data().gemini_key) {
-          setApiKey(keySnap.data().gemini_key);
+        const envKey = import.meta.env.VITE_GEMINI_API_KEY;
+        if (envKey) {
+          setApiKey(envKey);
         } else {
-          setApiKey("");
+          const keySnap = await getDoc(doc(db, 'artifacts', appId, 'public', 'data', 'config', 'secrets'));
+          if (keySnap.exists() && keySnap.data().gemini_key) {
+            setApiKey(keySnap.data().gemini_key);
+          } else {
+            setApiKey("");
+          }
         }
       } catch (e) { console.error(e); setApiKey(""); }
-      
+
       setLoadingKey(false);
       setAuthMode('app');
     };
@@ -153,27 +158,27 @@ export default function NutriAIPro() {
 
   return (
     <div className="relative min-h-screen font-sans text-gray-800 pb-24 md:max-w-md md:mx-auto md:shadow-2xl md:min-h-screen md:border-x border-gray-200 bg-gray-50">
-      
+
       <BackgroundPattern />
 
       <div className="relative z-10 p-4 min-h-screen">
         {!apiKey && (
-           <div className="bg-white/90 backdrop-blur p-4 rounded-2xl shadow-lg border border-red-100 text-xs text-red-800 text-center mb-4">
-             <div className="flex items-center justify-center gap-2 mb-2 font-bold">
-               <AlertTriangle size={16} className="text-red-500"/>
-               <span>API Key Mancante</span>
-             </div>
-             <p className="mb-2 opacity-80">Inserisci la chiave per attivare l'AI:</p>
-             <div className="flex justify-center">
-               <input 
-                 type="text" 
-                 placeholder="Incolla API Key qui..." 
-                 className="p-2 w-full max-w-xs rounded-lg border border-red-200 bg-white focus:ring-2 focus:ring-red-500 outline-none text-center"
-                 onKeyDown={(e) => { if(e.key === 'Enter') setApiKey(e.target.value); }}
-                 onBlur={(e) => { if(e.target.value) setApiKey(e.target.value); }}
-               />
-             </div>
-           </div>
+          <div className="bg-white/90 backdrop-blur p-4 rounded-2xl shadow-lg border border-red-100 text-xs text-red-800 text-center mb-4">
+            <div className="flex items-center justify-center gap-2 mb-2 font-bold">
+              <AlertTriangle size={16} className="text-red-500" />
+              <span>API Key Mancante</span>
+            </div>
+            <p className="mb-2 opacity-80">Inserisci la chiave per attivare l'AI:</p>
+            <div className="flex justify-center">
+              <input
+                type="text"
+                placeholder="Incolla API Key qui..."
+                className="p-2 w-full max-w-xs rounded-lg border border-red-200 bg-white focus:ring-2 focus:ring-red-500 outline-none text-center"
+                onKeyDown={(e) => { if (e.key === 'Enter') setApiKey(e.target.value); }}
+                onBlur={(e) => { if (e.target.value) setApiKey(e.target.value); }}
+              />
+            </div>
+          </div>
         )}
 
         <div className="animate-in fade-in duration-300">
@@ -190,8 +195,8 @@ export default function NutriAIPro() {
         <NavBtn icon={<PieChart size={22} />} label="Oggi" active={activeTab === 'daily'} onClick={() => setActiveTab('daily')} />
         <NavBtn icon={<Calendar size={22} />} label="Piano" active={activeTab === 'planner'} onClick={() => setActiveTab('planner')} />
         <div className="relative -top-8">
-          <button 
-            onClick={() => setActiveTab('add')} 
+          <button
+            onClick={() => setActiveTab('add')}
             className="bg-gradient-to-br from-emerald-500 to-emerald-700 text-white p-4 rounded-full shadow-2xl hover:scale-105 transition-transform border-4 border-white"
           >
             <Plus size={32} />
@@ -224,7 +229,7 @@ function AuthScreen({ mode, setMode }) {
 
   return (
     <div className="min-h-screen bg-emerald-600 flex flex-col justify-center p-6 text-white relative overflow-hidden">
-      <BackgroundPattern/>
+      <BackgroundPattern />
       <div className="relative z-10">
         <div className="mb-10 text-center">
           <div className="bg-white w-24 h-24 rounded-3xl flex items-center justify-center mx-auto mb-6 shadow-xl rotate-3">
@@ -239,15 +244,15 @@ function AuthScreen({ mode, setMode }) {
           {error && <div className="bg-red-50 text-red-500 p-3 rounded-xl text-sm mb-4">{error}</div>}
           <form onSubmit={handleAuth} className="space-y-4">
             <div className="relative">
-              <Mail className="absolute left-4 top-3.5 text-gray-400" size={20}/>
+              <Mail className="absolute left-4 top-3.5 text-gray-400" size={20} />
               <input type="email" placeholder="Email" required value={email} onChange={e => setEmail(e.target.value)} className="w-full pl-12 p-3.5 bg-gray-50 rounded-xl border border-gray-200 focus:border-emerald-500 focus:ring-2 ring-emerald-200 outline-none transition-all" />
             </div>
             <div className="relative">
-              <Lock className="absolute left-4 top-3.5 text-gray-400" size={20}/>
+              <Lock className="absolute left-4 top-3.5 text-gray-400" size={20} />
               <input type="password" placeholder="Password" required minLength={6} value={password} onChange={e => setPassword(e.target.value)} className="w-full pl-12 p-3.5 bg-gray-50 rounded-xl border border-gray-200 focus:border-emerald-500 focus:ring-2 ring-emerald-200 outline-none transition-all" />
             </div>
             <button type="submit" disabled={loading} className="w-full bg-emerald-600 text-white py-4 rounded-xl font-bold hover:bg-emerald-700 transition-colors flex justify-center shadow-lg shadow-emerald-200">
-               {loading ? <Loader2 className="animate-spin"/> : (mode === 'login' ? 'Accedi' : 'Crea Account')}
+              {loading ? <Loader2 className="animate-spin" /> : (mode === 'login' ? 'Accedi' : 'Crea Account')}
             </button>
           </form>
           <div className="mt-6 text-center text-sm text-gray-500">
@@ -255,7 +260,7 @@ function AuthScreen({ mode, setMode }) {
             <button onClick={() => setMode(mode === 'login' ? 'register' : 'login')} className="text-emerald-600 font-bold hover:underline">{mode === 'login' ? "Registrati" : "Accedi"}</button>
           </div>
           <div className="mt-6 border-t border-gray-100 pt-4 text-center">
-             <button onClick={async () => { setLoading(true); try { await signInAnonymously(auth); } catch(e) { setError(e.message); setLoading(false); } }} className="text-gray-400 text-xs hover:text-gray-600 underline">Continua come ospite</button>
+            <button onClick={async () => { setLoading(true); try { await signInAnonymously(auth); } catch (e) { setError(e.message); setLoading(false); } }} className="text-gray-400 text-xs hover:text-gray-600 underline">Continua come ospite</button>
           </div>
         </div>
       </div>
@@ -275,8 +280,11 @@ function DailyView({ user, profile, setActiveTab, apiKey }) {
   const [logs, setLogs] = useState([]);
   const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
   const [ingredients, setIngredients] = useState('');
-  const [suggestedRecipe, setSuggestedRecipe] = useState(null);
+  const [suggestedRecipes, setSuggestedRecipes] = useState(null);
+  const [selectedRecipeIndex, setSelectedRecipeIndex] = useState(null);
+  const [showInstructions, setShowInstructions] = useState(false);
   const [loadingRecipe, setLoadingRecipe] = useState(false);
+  const [viewingMeal, setViewingMeal] = useState(null);
 
   const bmr = profile.weight ? (10 * profile.weight) + (6.25 * profile.height) - (5 * profile.age) + (profile.gender === 'Uomo' ? 5 : -161) : 2000;
   const targetCals = Math.round(bmr * (profile.goal === 'Dimagrimento' ? 1.1 : profile.goal === 'Aumento Massa' ? 1.4 : 1.2));
@@ -294,21 +302,31 @@ function DailyView({ user, profile, setActiveTab, apiKey }) {
   }), { cals: 0, prot: 0, carb: 0, fat: 0 });
 
   const getRecipe = async () => {
-    if(!apiKey) return alert("Manca API Key");
-    if(!ingredients) return alert("Inserisci ingredienti!");
+    if (!apiKey) return alert("Manca API Key");
+    if (!ingredients) return alert("Inserisci ingredienti!");
     setLoadingRecipe(true);
-    setSuggestedRecipe(null);
-    const prompt = `Chef nutrizionista. Ingredienti: "${ingredients}". Obiettivo: ${profile.goal}. Ricetta sana. JSON: { "name": "...", "description": "...", "calories": 0, "protein": 0, "carbs": 0, "fat": 0, "instructions": "...", "note": "..." }`;
+    setSuggestedRecipes(null);
+    setSelectedRecipeIndex(null);
+    setShowInstructions(false);
+    const prompt = `Chef nutrizionista. Ingredienti: "${ingredients}". Obiettivo: ${profile.goal}. Proponi 3 diverse opzioni di ricette sane.
+    JSON: { "recipes": [ 
+      { "name": "...", "description": "...", "calories": 0, "protein": 0, "carbs": 0, "fat": 0, "instructions": "...", "note": "..." },
+      { "name": "...", "description": "...", "calories": 0, "protein": 0, "carbs": 0, "fat": 0, "instructions": "...", "note": "..." },
+      { "name": "...", "description": "...", "calories": 0, "protein": 0, "carbs": 0, "fat": 0, "instructions": "...", "note": "..." }
+    ] }`;
     const res = await callGemini(prompt, apiKey);
-    if(res) setSuggestedRecipe(res);
-    else alert("Errore generazione ricetta.");
+    if (res && res.recipes) setSuggestedRecipes(res.recipes);
+    else alert("Errore generazione ricette.");
     setLoadingRecipe(false);
   };
 
   const addSuggestedMeal = async () => {
-    if(!suggestedRecipe) return;
-    await addDoc(collection(db, 'artifacts', appId, 'users', user.uid, 'food_logs'), { ...suggestedRecipe, date: date, timestamp: new Date().toISOString() });
-    setSuggestedRecipe(null); setIngredients('');
+    if (selectedRecipeIndex === null || !suggestedRecipes) return;
+    const meal = suggestedRecipes[selectedRecipeIndex];
+    await addDoc(collection(db, 'artifacts', appId, 'users', user.uid, 'food_logs'), { ...meal, date: date, timestamp: new Date().toISOString() });
+    setSuggestedRecipes(null);
+    setSelectedRecipeIndex(null);
+    setIngredients('');
   };
 
   return (
@@ -331,7 +349,7 @@ function DailyView({ user, profile, setActiveTab, apiKey }) {
           <div className="h-16 w-16">
             <svg viewBox="0 0 36 36" className="w-full h-full transform -rotate-90">
               <path d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" fill="none" stroke="#f0fdf4" strokeWidth="4" />
-              <path d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" fill="none" stroke="#10b981" strokeWidth="4" strokeDasharray={`${Math.min((stats.cals/targetCals)*100, 100)}, 100`} />
+              <path d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" fill="none" stroke="#10b981" strokeWidth="4" strokeDasharray={`${Math.min((stats.cals / targetCals) * 100, 100)}, 100`} />
             </svg>
           </div>
         </div>
@@ -343,21 +361,61 @@ function DailyView({ user, profile, setActiveTab, apiKey }) {
       </div>
 
       <div className="bg-white/90 backdrop-blur border border-white/50 rounded-3xl p-5 shadow-sm">
-        <h3 className="font-bold text-gray-800 mb-2 flex items-center gap-2"><ChefHat size={20} className="text-orange-500"/> Chef Frigo</h3>
-        {!suggestedRecipe ? (
+        <h3 className="font-bold text-gray-800 mb-2 flex items-center gap-2"><ChefHat size={20} className="text-orange-500" /> Chef Frigo</h3>
+        {!suggestedRecipes ? (
           <div className="flex gap-2">
             <input value={ingredients} onChange={e => setIngredients(e.target.value)} placeholder="Ingredienti disponibili..." className="flex-1 p-3 rounded-xl border border-gray-200 text-sm focus:ring-2 focus:ring-orange-400 outline-none bg-white" />
-            <button onClick={getRecipe} disabled={loadingRecipe || !ingredients} className="bg-orange-500 text-white p-3 rounded-xl font-bold shadow-md disabled:opacity-50">{loadingRecipe ? <Loader2 className="animate-spin"/> : <Sparkles size={20}/>}</button>
+            <button onClick={getRecipe} disabled={loadingRecipe || !ingredients} className="bg-orange-500 text-white p-3 rounded-xl font-bold shadow-md disabled:opacity-50">{loadingRecipe ? <Loader2 className="animate-spin" /> : <Sparkles size={20} />}</button>
           </div>
         ) : (
-          <div className="bg-orange-50 p-4 rounded-2xl border border-orange-100 animate-in fade-in">
-            <div className="flex justify-between items-start mb-2">
-              <h4 className="font-bold text-gray-800">{suggestedRecipe.name}</h4>
-              <button onClick={() => setSuggestedRecipe(null)} className="text-gray-400"><X size={16}/></button>
+          <div className="space-y-4 animate-in fade-in">
+            <div className="flex justify-between items-center mb-2">
+              <span className="text-xs font-bold text-orange-600 uppercase tracking-wider">Scegli una ricetta:</span>
+              <button onClick={() => setSuggestedRecipes(null)} className="text-gray-400 p-1 hover:bg-orange-100 rounded-full transition-colors"><X size={18} /></button>
             </div>
-            <p className="text-xs text-gray-500 mb-3">{suggestedRecipe.description}</p>
-            <div className="flex gap-3 text-xs font-bold text-gray-600 mb-3"><span>🔥 {suggestedRecipe.calories}</span><span>P: {suggestedRecipe.protein}</span><span>C: {suggestedRecipe.carbs}</span><span>G: {suggestedRecipe.fat}</span></div>
-            <button onClick={addSuggestedMeal} className="w-full bg-orange-200 text-orange-800 py-2 rounded-xl font-bold text-sm">Aggiungi</button>
+
+            <div className="space-y-2">
+              {suggestedRecipes.map((recipe, idx) => (
+                <button
+                  key={idx}
+                  onClick={() => { setSelectedRecipeIndex(idx); setShowInstructions(false); }}
+                  className={`w-full text-left p-3 rounded-2xl border transition-all ${selectedRecipeIndex === idx ? 'bg-orange-100 border-orange-300 shadow-sm' : 'bg-white border-orange-50 hover:border-orange-200'}`}
+                >
+                  <div className="font-bold text-gray-800 text-sm">{recipe.name}</div>
+                  <div className="text-[10px] text-gray-500 mt-1 flex gap-2">
+                    <span>🔥 {recipe.calories} kcal</span>
+                    <span>P: {recipe.protein}g</span>
+                    <span>C: {recipe.carbs}g</span>
+                    <span>G: {recipe.fat}g</span>
+                  </div>
+                </button>
+              ))}
+            </div>
+
+            {selectedRecipeIndex !== null && (
+              <div className="bg-white p-4 rounded-2xl border border-orange-100 animate-in slide-in-from-top-1 duration-200">
+                <h4 className="font-bold text-gray-800 mb-1">{suggestedRecipes[selectedRecipeIndex].name}</h4>
+                <p className="text-xs text-gray-500 mb-4">{suggestedRecipes[selectedRecipeIndex].description}</p>
+
+                {showInstructions ? (
+                  <div className="bg-orange-50/50 p-3 rounded-xl mb-4 border border-orange-100/50">
+                    <div className="text-[10px] font-bold text-orange-700 uppercase mb-2">Preparazione:</div>
+                    <div className="text-xs text-gray-700 leading-relaxed whitespace-pre-wrap">{suggestedRecipes[selectedRecipeIndex].instructions}</div>
+                  </div>
+                ) : (
+                  <button
+                    onClick={() => setShowInstructions(true)}
+                    className="w-full mb-3 text-xs text-orange-600 font-bold flex items-center justify-center gap-1 hover:underline"
+                  >
+                    Mostra come prepararlo <ChevronLeft className="-rotate-90" size={14} />
+                  </button>
+                )}
+
+                <button onClick={addSuggestedMeal} className="w-full bg-orange-500 text-white py-3 rounded-xl font-bold text-sm shadow-md hover:bg-orange-600 transition-colors">
+                  Aggiungi al diario
+                </button>
+              </div>
+            )}
           </div>
         )}
       </div>
@@ -372,20 +430,85 @@ function DailyView({ user, profile, setActiveTab, apiKey }) {
         ) : (
           <div className="space-y-3">
             {logs.map(log => (
-              <div key={log.id} className="bg-white/95 backdrop-blur p-4 rounded-2xl shadow-sm flex justify-between items-center">
-                <div>
-                  <div className="font-bold text-gray-800 capitalize">{log.name}</div>
+              <div key={log.id} className="bg-white/95 backdrop-blur p-4 rounded-2xl shadow-sm flex justify-between items-center group">
+                <div className="flex-1 cursor-pointer" onClick={() => log.instructions && setViewingMeal(log)}>
+                  <div className="flex items-center gap-2">
+                    <div className="font-bold text-gray-800 capitalize">{log.name}</div>
+                    {log.instructions && <Sparkles size={14} className="text-orange-500" />}
+                  </div>
                   <div className="text-xs text-gray-500 mt-1 flex gap-3">
                     <span className="font-medium text-emerald-600">{log.calories} kcal</span>
                     <span>P: {log.protein}</span><span>C: {log.carbs}</span><span>G: {log.fat}</span>
                   </div>
                 </div>
-                <button onClick={() => deleteDoc(doc(db, 'artifacts', appId, 'users', user.uid, 'food_logs', log.id))} className="p-2 text-gray-300 hover:text-red-500"><X size={18} /></button>
+                <div className="flex items-center gap-1">
+                  {log.instructions && (
+                    <button onClick={() => setViewingMeal(log)} className="p-2 text-gray-300 hover:text-orange-500 transition-colors">
+                      <ChevronLeft className="-rotate-90" size={18} />
+                    </button>
+                  )}
+                  <button onClick={() => deleteDoc(doc(db, 'artifacts', appId, 'users', user.uid, 'food_logs', log.id))} className="p-2 text-gray-300 hover:text-red-500 transition-colors">
+                    <X size={18} />
+                  </button>
+                </div>
               </div>
             ))}
           </div>
         )}
       </div>
+
+      {/* MODAL DETTAGLIO PASTO */}
+      {viewingMeal && (
+        <div className="fixed inset-0 z-[100] bg-black/60 backdrop-blur-sm flex items-end justify-center animate-in fade-in duration-200" onClick={() => setViewingMeal(null)}>
+          <div className="bg-white w-full max-w-md rounded-t-[32px] p-6 pb-safe-bottom animate-in slide-in-from-bottom duration-300" onClick={e => e.stopPropagation()}>
+            <div className="w-12 h-1.5 bg-gray-200 rounded-full mx-auto mb-6" onClick={() => setViewingMeal(null)}></div>
+
+            <div className="flex justify-between items-start mb-4">
+              <div>
+                <h3 className="text-2xl font-bold text-gray-800 capitalize">{viewingMeal.name}</h3>
+                <p className="text-emerald-600 font-bold">{viewingMeal.calories} kcal</p>
+              </div>
+              <button onClick={() => setViewingMeal(null)} className="p-2 bg-gray-100 rounded-full text-gray-400"><X size={20} /></button>
+            </div>
+
+            <div className="grid grid-cols-3 gap-3 mb-6">
+              <div className="bg-blue-50 p-3 rounded-2xl text-center">
+                <div className="text-[10px] font-bold text-blue-400 uppercase">Proteine</div>
+                <div className="font-bold text-blue-700">{viewingMeal.protein}g</div>
+              </div>
+              <div className="bg-amber-50 p-3 rounded-2xl text-center">
+                <div className="text-[10px] font-bold text-amber-400 uppercase">Carbi</div>
+                <div className="font-bold text-amber-700">{viewingMeal.carbs}g</div>
+              </div>
+              <div className="bg-rose-50 p-3 rounded-2xl text-center">
+                <div className="text-[10px] font-bold text-rose-400 uppercase">Grassi</div>
+                <div className="font-bold text-rose-700">{viewingMeal.fat}g</div>
+              </div>
+            </div>
+
+            {viewingMeal.instructions && (
+              <div className="bg-gray-50 p-5 rounded-2xl border border-gray-100 max-h-[40vh] overflow-y-auto">
+                <div className="flex items-center gap-2 mb-3 text-orange-600">
+                  <ChefHat size={18} />
+                  <span className="font-bold text-sm uppercase tracking-wider">Preparazione</span>
+                </div>
+                <div className="text-sm text-gray-700 leading-relaxed whitespace-pre-wrap">
+                  {viewingMeal.instructions}
+                </div>
+              </div>
+            )}
+
+            {viewingMeal.note && (
+              <div className="mt-4 p-4 border-l-4 border-emerald-500 bg-emerald-50/50 rounded-r-2xl">
+                <div className="text-[10px] font-bold text-emerald-700 uppercase mb-1">Nota Nutrizionale</div>
+                <div className="text-xs text-gray-600 italic">{viewingMeal.note}</div>
+              </div>
+            )}
+
+            <button onClick={() => setViewingMeal(null)} className="w-full bg-gray-900 text-white py-4 rounded-2xl font-bold mt-8 shadow-lg">Chiudi</button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -396,7 +519,7 @@ const MacroPill = ({ label, val, total, color }) => (
     <div className="mt-2">
       <div className="text-sm font-bold text-gray-800">{Math.round(val)}g</div>
       <div className="w-full bg-gray-200 h-1.5 rounded-full mt-1 overflow-hidden">
-        <div className={`h-full ${color}`} style={{ width: `${Math.min((val/total)*100, 100)}%` }}></div>
+        <div className={`h-full ${color}`} style={{ width: `${Math.min((val / total) * 100, 100)}%` }}></div>
       </div>
     </div>
   </div>
@@ -408,20 +531,45 @@ function WeeklyPlanner({ user, profile, apiKey }) {
   const [loading, setLoading] = useState(false);
   const [selectedDay, setSelectedDay] = useState('lunedì');
   const days = ['lunedì', 'martedì', 'mercoledì', 'giovedì', 'venerdì', 'sabato', 'domenica'];
-  const [assessment, setAssessment] = useState({ activityLevel: 'Sedentario', dietType: 'Onnivoro', allergies: '', mealsPerDay: '3', conditions: '' });
+  const [assessment, setAssessment] = useState({
+    activityLevel: 'Sedentario',
+    dietType: 'Onnivoro',
+    allergies: '',
+    mealsPerDay: '3',
+    dislikedFoods: '',
+    cookingSkill: 'Pratico',
+    prepTime: { breakfast: '15', lunch: '30', dinner: '30' }
+  });
 
   useEffect(() => {
     getDoc(doc(db, 'artifacts', appId, 'users', user.uid, 'plans', 'current_week')).then(s => s.exists() && setWeekPlan(s.data()));
-    getDoc(doc(db, 'artifacts', appId, 'users', user.uid, 'profile', 'assessment')).then(s => s.exists() && setAssessment(s.data()));
+    getDoc(doc(db, 'artifacts', appId, 'users', user.uid, 'profile', 'assessment')).then(s => {
+      if (s.exists()) {
+        const data = s.data();
+        setAssessment(prev => ({
+          ...prev,
+          ...data,
+          prepTime: { ...prev.prepTime, ...(data.prepTime || {}) }
+        }));
+      }
+    });
   }, [user]);
 
   const generateWeek = async () => {
-    if(!apiKey) return alert("API Key non configurata");
+    if (!apiKey) return alert("API Key non configurata");
     setLoading(true);
     await setDoc(doc(db, 'artifacts', appId, 'users', user.uid, 'profile', 'assessment'), assessment);
-    const prompt = `Piano 7 giorni. Profilo: ${JSON.stringify(profile)}, Attività: ${assessment.activityLevel}, Dieta: ${assessment.dietType}, Allergie: ${assessment.allergies}. JSON: { "lunedì": { "colazione": "...", "pranzo": "...", "cena": "...", "totale_cal": 0 }, ... }`;
+    const prompt = `Chef nutrizionista. Crea un piano di 7 giorni. 
+    Profilo: ${JSON.stringify(profile)}. 
+    Attività: ${assessment.activityLevel}. 
+    Dieta: ${assessment.dietType}. 
+    Allergie: ${assessment.allergies}. 
+    Cibi da evitare: ${assessment.dislikedFoods}.
+    Livello cucina: ${assessment.cookingSkill}.
+    Tempi max: Colazione ${assessment.prepTime?.breakfast || '15'}min, Pranzo ${assessment.prepTime?.lunch || '30'}min, Cena ${assessment.prepTime?.dinner || '30'}min.
+    JSON: { "lunedì": { "colazione": "Ricetta (tempo)", "pranzo": "Ricetta (tempo)", "cena": "Ricetta (tempo)", "totale_cal": 0 }, ... }`;
     const res = await callGemini(prompt, apiKey);
-    if(res) { setWeekPlan(res); await setDoc(doc(db, 'artifacts', appId, 'users', user.uid, 'plans', 'current_week'), res); setShowWizard(false); }
+    if (res) { setWeekPlan(res); await setDoc(doc(db, 'artifacts', appId, 'users', user.uid, 'plans', 'current_week'), res); setShowWizard(false); }
     setLoading(false);
   };
 
@@ -429,15 +577,48 @@ function WeeklyPlanner({ user, profile, apiKey }) {
     return (
       <div className="fixed inset-0 z-[60] bg-white p-6 animate-in slide-in-from-right flex flex-col">
         <div className="flex items-center mb-6 pt-safe-top">
-          <button onClick={() => setShowWizard(false)} className="p-2 -ml-2 text-gray-400"><ChevronLeft/></button>
+          <button onClick={() => setShowWizard(false)} className="p-2 -ml-2 text-gray-400"><ChevronLeft /></button>
           <h2 className="text-xl font-bold ml-2">Personalizza</h2>
         </div>
-        <div className="space-y-6 flex-1 overflow-y-auto">
-          <div><label className="font-bold block mb-2">Attività</label><div className="grid grid-cols-2 gap-2">{['Sedentario', 'Leggero', 'Moderato', 'Intenso'].map(o => <button key={o} onClick={()=>setAssessment({...assessment, activityLevel: o})} className={`p-3 rounded-xl border text-sm font-bold ${assessment.activityLevel===o?'bg-emerald-100 border-emerald-500 text-emerald-800':'border-gray-200'}`}>{o}</button>)}</div></div>
-          <div><label className="font-bold block mb-2">Dieta</label><select value={assessment.dietType} onChange={e=>setAssessment({...assessment, dietType: e.target.value})} className="w-full p-4 bg-gray-50 border rounded-xl"><option>Onnivoro</option><option>Vegetariano</option><option>Vegano</option><option>Cheto</option></select></div>
-          <div><label className="font-bold block mb-2">Allergie</label><input value={assessment.allergies} onChange={e=>setAssessment({...assessment, allergies: e.target.value})} className="w-full p-4 bg-gray-50 border rounded-xl" placeholder="Nessuna..." /></div>
+        <div className="space-y-6 flex-1 overflow-y-auto pb-24">
+          <div className="bg-emerald-50 p-4 rounded-2xl flex gap-3 items-center text-emerald-800 text-sm">
+            <Sparkles className="shrink-0" />
+            <p>Questa "intervista" mi aiuta a creare piatti perfetti per i tuoi gusti e il tuo tempo.</p>
+          </div>
+
+          <div><label className="font-bold block mb-2 text-gray-700">Attività Fisica</label><div className="grid grid-cols-2 gap-2">{['Sedentario', 'Leggero', 'Moderato', 'Intenso'].map(o => <button key={o} onClick={() => setAssessment({ ...assessment, activityLevel: o })} className={`p-3 rounded-xl border text-sm font-bold transition-all ${assessment.activityLevel === o ? 'bg-emerald-600 border-emerald-600 text-white shadow-md' : 'border-gray-200 bg-gray-50 text-gray-500'}`}>{o}</button>)}</div></div>
+
+          <div><label className="font-bold block mb-2 text-gray-700">Regime Alimentare</label><select value={assessment.dietType} onChange={e => setAssessment({ ...assessment, dietType: e.target.value })} className="w-full p-4 bg-gray-50 border border-gray-100 rounded-xl outline-none focus:ring-2 ring-emerald-500"><option>Onnivoro</option><option>Vegetariano</option><option>Vegano</option><option>Cheto</option><option>Paleo</option></select></div>
+
+          <div><label className="font-bold block mb-2 text-gray-700 font-bold flex items-center gap-2">⚠️ Allergie o Intolleranze</label><input value={assessment.allergies} onChange={e => setAssessment({ ...assessment, allergies: e.target.value })} className="w-full p-4 bg-gray-50 border border-gray-100 rounded-xl outline-none focus:ring-2 ring-emerald-500" placeholder="Es: Lattosio, Glutine..." /></div>
+
+          <div className="border-t border-gray-100 pt-6">
+            <label className="font-bold block mb-2 text-gray-700 flex items-center gap-2"><X className="text-red-500" size={18} /> Cibi da evitare (Non ti piacciono?)</label>
+            <textarea value={assessment.dislikedFoods} onChange={e => setAssessment({ ...assessment, dislikedFoods: e.target.value })} className="w-full p-4 bg-gray-50 border border-gray-100 rounded-xl outline-none focus:ring-2 ring-emerald-500 h-24 resize-none" placeholder="Es: Cipolla, Broccoli, Coriandolo..." />
+          </div>
+
+          <div>
+            <label className="font-bold block mb-2 text-gray-700">Abilità ai Fornelli</label>
+            <div className="grid grid-cols-3 gap-2">
+              {['Principiante', 'Pratico', 'Chef'].map(o => (
+                <button key={o} onClick={() => setAssessment({ ...assessment, cookingSkill: o })} className={`p-3 rounded-xl border text-[10px] font-bold transition-all ${assessment.cookingSkill === o ? 'bg-emerald-600 border-emerald-600 text-white shadow-md' : 'border-gray-200 bg-gray-50 text-gray-500'}`}>
+                  {o === 'Principiante' && '🍳'} {o === 'Pratico' && '🥘'} {o === 'Chef' && '🤵'}
+                  <div className="mt-1">{o}</div>
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div>
+            <label className="font-bold block mb-3 text-gray-700 flex items-center gap-2"><PieChart size={18} className="text-blue-500" /> Quanto tempo hai per cucinare? (min)</label>
+            <div className="grid grid-cols-3 gap-3">
+              <div><span className="text-[10px] text-gray-400 font-bold uppercase block mb-1">Colazione</span><input type="number" value={assessment.prepTime?.breakfast || '15'} onChange={e => setAssessment({ ...assessment, prepTime: { ...assessment.prepTime, breakfast: e.target.value } })} className="w-full p-3 bg-gray-50 border border-gray-100 rounded-xl text-center font-bold" /></div>
+              <div><span className="text-[10px] text-gray-400 font-bold uppercase block mb-1">Pranzo</span><input type="number" value={assessment.prepTime?.lunch || '30'} onChange={e => setAssessment({ ...assessment, prepTime: { ...assessment.prepTime, lunch: e.target.value } })} className="w-full p-3 bg-gray-50 border border-gray-100 rounded-xl text-center font-bold" /></div>
+              <div><span className="text-[10px] text-gray-400 font-bold uppercase block mb-1">Cena</span><input type="number" value={assessment.prepTime?.dinner || '30'} onChange={e => setAssessment({ ...assessment, prepTime: { ...assessment.prepTime, dinner: e.target.value } })} className="w-full p-3 bg-gray-50 border border-gray-100 rounded-xl text-center font-bold" /></div>
+            </div>
+          </div>
         </div>
-        <button onClick={generateWeek} disabled={loading} className="w-full bg-emerald-600 text-white py-4 rounded-xl font-bold mt-4 shadow-xl mb-safe">{loading ? <Loader2 className="animate-spin mx-auto"/> : "Genera Piano"}</button>
+        <button onClick={generateWeek} disabled={loading} className="w-full bg-emerald-600 text-white py-4 rounded-xl font-bold mt-4 shadow-xl mb-safe">{loading ? <Loader2 className="animate-spin mx-auto" /> : "Genera Piano"}</button>
       </div>
     );
   }
@@ -448,7 +629,7 @@ function WeeklyPlanner({ user, profile, apiKey }) {
         <h1 className="text-2xl font-bold">Piano Settimanale</h1>
         {weekPlan && <button onClick={() => setShowWizard(true)} className="text-xs bg-white/20 px-3 py-1 rounded-full backdrop-blur">Rigenera</button>}
       </div>
-      
+
       {!weekPlan ? (
         <div className="bg-white/95 backdrop-blur rounded-3xl p-8 text-center shadow-xl">
           <CheckCircle2 className="mx-auto text-emerald-500 mb-4" size={48} />
@@ -459,16 +640,16 @@ function WeeklyPlanner({ user, profile, apiKey }) {
       ) : (
         <div className="bg-white/95 backdrop-blur rounded-3xl p-6 shadow-xl border border-white/50 pb-20">
           <div className="flex gap-2 overflow-x-auto pb-4 mb-2 no-scrollbar">
-            {days.map(d => <button key={d} onClick={() => setSelectedDay(d)} className={`px-4 py-2 rounded-full whitespace-nowrap text-sm font-bold transition-all ${selectedDay === d ? 'bg-emerald-600 text-white shadow-md' : 'bg-gray-100 text-gray-500'}`}>{d.slice(0,3)}</button>)}
+            {days.map(d => <button key={d} onClick={() => setSelectedDay(d)} className={`px-4 py-2 rounded-full whitespace-nowrap text-sm font-bold transition-all ${selectedDay === d ? 'bg-emerald-600 text-white shadow-md' : 'bg-gray-100 text-gray-500'}`}>{d.slice(0, 3)}</button>)}
           </div>
           <div className="space-y-4 animate-in fade-in">
-             {weekPlan[selectedDay] && Object.entries(weekPlan[selectedDay]).map(([k, v]) => k !== 'totale_cal' && (
-               <div key={k} className="border-l-4 border-emerald-500 pl-4 py-1">
-                 <div className="text-xs uppercase tracking-wider text-gray-400 font-bold mb-1">{k}</div>
-                 <div className="text-gray-800 font-medium text-sm leading-relaxed">{v}</div>
-               </div>
-             ))}
-             <div className="mt-4 pt-4 border-t border-gray-100 text-right text-emerald-600 font-bold text-sm">Totale: {weekPlan[selectedDay]?.totale_cal} kcal</div>
+            {weekPlan[selectedDay] && Object.entries(weekPlan[selectedDay]).map(([k, v]) => k !== 'totale_cal' && (
+              <div key={k} className="border-l-4 border-emerald-500 pl-4 py-1">
+                <div className="text-xs uppercase tracking-wider text-gray-400 font-bold mb-1">{k}</div>
+                <div className="text-gray-800 font-medium text-sm leading-relaxed">{v}</div>
+              </div>
+            ))}
+            <div className="mt-4 pt-4 border-t border-gray-100 text-right text-emerald-600 font-bold text-sm">Totale: {weekPlan[selectedDay]?.totale_cal} kcal</div>
           </div>
         </div>
       )}
@@ -499,24 +680,24 @@ function TrendsAnalytics({ user }) {
   useEffect(() => {
     const d = new Date(); d.setDate(d.getDate() - 30);
     const dateStr = d.toISOString().split('T')[0];
-    
+
     // Safety check for logs
     const qFood = query(collection(db, 'artifacts', appId, 'users', user.uid, 'food_logs'), where("date", ">=", dateStr));
     const unsubFood = onSnapshot(qFood, (snap) => {
-      const agg = snap.docs.reduce((acc, d) => { 
+      const agg = snap.docs.reduce((acc, d) => {
         const data = d.data();
-        if (data.date) { 
-            if(!acc[data.date]) acc[data.date] = {date: data.date, cal:0}; 
-            acc[data.date].cal += (data.calories || 0); 
+        if (data.date) {
+          if (!acc[data.date]) acc[data.date] = { date: data.date, cal: 0 };
+          acc[data.date].cal += (data.calories || 0);
         }
-        return acc; 
+        return acc;
       }, {});
-      setHistory(Object.values(agg).sort((a,b)=>a.date.localeCompare(b.date)));
+      setHistory(Object.values(agg).sort((a, b) => a.date.localeCompare(b.date)));
     }, (error) => console.error("Food logs error:", error));
 
     const qWeight = query(collection(db, 'artifacts', appId, 'users', user.uid, 'measurements'), orderBy("date", "asc"));
     const unsubWeight = onSnapshot(qWeight, (snap) => {
-      setWeightHistory(snap.docs.map(d=>d.data()).filter(d => d.date && d.weight)); 
+      setWeightHistory(snap.docs.map(d => d.data()).filter(d => d.date && d.weight));
     }, (error) => console.error("Weight error:", error));
 
     return () => { unsubFood(); unsubWeight(); };
@@ -525,32 +706,32 @@ function TrendsAnalytics({ user }) {
   return (
     <div className="space-y-6 pb-20">
       <h1 className="text-2xl font-bold text-white pt-2">I tuoi progressi</h1>
-      
+
       <div className="bg-white/95 backdrop-blur p-5 rounded-3xl shadow-xl border border-white/50 h-72">
-        <h3 className="text-sm font-bold text-gray-500 mb-4 flex items-center gap-2"><Scale size={16}/> Peso</h3>
+        <h3 className="text-sm font-bold text-gray-500 mb-4 flex items-center gap-2"><Scale size={16} /> Peso</h3>
         <ResponsiveContainer width="100%" height="85%">
           <LineChart data={weightHistory}>
-            <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f0f0f0"/>
-            <Line type="monotone" dataKey="weight" stroke="#10b981" strokeWidth={3} dot={{fill:'#10b981', r:4}} />
+            <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f0f0f0" />
+            <Line type="monotone" dataKey="weight" stroke="#10b981" strokeWidth={3} dot={{ fill: '#10b981', r: 4 }} />
             <XAxis dataKey="date" hide />
-            <RechartsTooltip content={<TooltipCustom/>} />
+            <RechartsTooltip content={<TooltipCustom />} />
           </LineChart>
         </ResponsiveContainer>
       </div>
-      
-       <div className="bg-white/95 backdrop-blur p-5 rounded-3xl shadow-xl border border-white/50 h-72">
-        <h3 className="text-sm font-bold text-gray-500 mb-4 flex items-center gap-2"><TrendingUp size={16}/> Calorie (30gg)</h3>
+
+      <div className="bg-white/95 backdrop-blur p-5 rounded-3xl shadow-xl border border-white/50 h-72">
+        <h3 className="text-sm font-bold text-gray-500 mb-4 flex items-center gap-2"><TrendingUp size={16} /> Calorie (30gg)</h3>
         <ResponsiveContainer width="100%" height="85%">
           <AreaChart data={history}>
-            <CartesianGrid vertical={false} stroke="#f0f0f0"/>
+            <CartesianGrid vertical={false} stroke="#f0f0f0" />
             <Area type="monotone" dataKey="cal" stroke="#3b82f6" fill="#eff6ff" strokeWidth={2} />
-            <XAxis 
-                dataKey="date" 
-                tick={{fontSize:10}} 
-                tickFormatter={v => v ? v.slice(8) : ''} 
-                interval={2} 
+            <XAxis
+              dataKey="date"
+              tick={{ fontSize: 10 }}
+              tickFormatter={v => v ? v.slice(8) : ''}
+              interval={2}
             />
-            <RechartsTooltip content={<TooltipCustom/>} />
+            <RechartsTooltip content={<TooltipCustom />} />
           </AreaChart>
         </ResponsiveContainer>
       </div>
@@ -568,7 +749,7 @@ function AddFood({ user, profile, close, apiKey }) {
   const fileRef = useRef(null);
 
   const analyze = async () => {
-    if(!apiKey) return alert("API Key non trovata!");
+    if (!apiKey) return alert("API Key non trovata!");
     setLoading(true);
     let prompt = "";
     const baseReq = `Rispondi ESCLUSIVAMENTE con un JSON valido (no markdown): { "name": "Nome piatto", "calories": numero, "protein": num, "carbs": num, "fat": num, "note": "commento" }.`;
@@ -582,56 +763,56 @@ function AddFood({ user, profile, close, apiKey }) {
   };
 
   const saveLog = async () => {
-      if(!reviewData) return;
-      await addDoc(collection(db, 'artifacts', appId, 'users', user.uid, 'food_logs'), { ...reviewData, date: new Date().toISOString().split('T')[0], timestamp: new Date().toISOString() });
-      close();
+    if (!reviewData) return;
+    await addDoc(collection(db, 'artifacts', appId, 'users', user.uid, 'food_logs'), { ...reviewData, date: new Date().toISOString().split('T')[0], timestamp: new Date().toISOString() });
+    close();
   };
 
   const handleFile = (e) => {
     const reader = new FileReader();
     reader.onload = () => setImage(reader.result.split(',')[1]);
-    if(e.target.files[0]) reader.readAsDataURL(e.target.files[0]);
+    if (e.target.files[0]) reader.readAsDataURL(e.target.files[0]);
   };
 
   if (reviewData) {
-      return (
-          <div className="fixed inset-0 z-[60] bg-gray-50 flex flex-col h-[100dvh]">
-              <BackgroundPattern />
-              <div className="relative z-10 flex flex-col h-full">
-                <div className="bg-white/90 backdrop-blur p-4 shadow-sm flex items-center justify-between pt-safe-top border-b border-gray-200">
-                  <button onClick={() => setReviewData(null)} className="p-2 bg-gray-100 rounded-full"><ChevronLeft/></button>
-                  <h2 className="font-bold text-lg">Conferma Dati</h2>
-                  <div className="w-10"></div>
-                </div>
-                
-                <div className="flex-1 overflow-y-auto p-6 space-y-6 pb-24">
-                    <div className="bg-white/90 backdrop-blur p-4 rounded-xl text-emerald-800 text-sm flex gap-3 items-center shadow-sm">
-                      <Sparkles className="shrink-0 text-emerald-600"/>
-                      <p>Ho stimato questi valori. Correggili se necessario.</p>
-                    </div>
-                    <div>
-                        <label className="text-xs font-bold text-white uppercase ml-1">Pasto</label>
-                        <input value={reviewData.name} onChange={e => setReviewData({...reviewData, name: e.target.value})} className="w-full p-4 bg-white/95 backdrop-blur rounded-xl mt-1 font-bold text-lg shadow-sm border border-white/50" />
-                    </div>
-                    <div className="grid grid-cols-2 gap-4">
-                        <div><label className="text-xs font-bold text-white uppercase ml-1">Kcal</label><input type="number" value={reviewData.calories} onChange={e => setReviewData({...reviewData, calories: Number(e.target.value)})} className="w-full p-4 bg-white/95 backdrop-blur rounded-xl mt-1 font-bold text-emerald-600 text-xl shadow-sm border border-white/50" /></div>
-                        <div className="space-y-2">
-                             <div className="bg-white/95 backdrop-blur p-2 rounded-lg shadow-sm flex justify-between text-sm"><span>Prot</span><input type="number" value={reviewData.protein} onChange={e => setReviewData({...reviewData, protein: Number(e.target.value)})} className="w-12 text-right font-bold text-blue-600 outline-none bg-transparent"/></div>
-                             <div className="bg-white/95 backdrop-blur p-2 rounded-lg shadow-sm flex justify-between text-sm"><span>Carb</span><input type="number" value={reviewData.carbs} onChange={e => setReviewData({...reviewData, carbs: Number(e.target.value)})} className="w-12 text-right font-bold text-amber-600 outline-none bg-transparent"/></div>
-                             <div className="bg-white/95 backdrop-blur p-2 rounded-lg shadow-sm flex justify-between text-sm"><span>Gras</span><input type="number" value={reviewData.fat} onChange={e => setReviewData({...reviewData, fat: Number(e.target.value)})} className="w-12 text-right font-bold text-rose-600 outline-none bg-transparent"/></div>
-                        </div>
-                    </div>
-                </div>
-
-                <div className="p-4 bg-white/90 backdrop-blur border-t border-gray-200 pb-safe">
-                    <div className="flex gap-3">
-                      <button onClick={() => setReviewData(null)} className="flex-1 py-4 font-bold text-gray-500 bg-gray-100 rounded-xl">Annulla</button>
-                      <button onClick={saveLog} className="flex-[2] py-4 bg-emerald-600 text-white rounded-xl font-bold shadow-lg flex justify-center gap-2 items-center"><CheckCircle2/> Salva</button>
-                    </div>
-                </div>
-              </div>
+    return (
+      <div className="fixed inset-0 z-[60] bg-gray-50 flex flex-col h-[100dvh]">
+        <BackgroundPattern />
+        <div className="relative z-10 flex flex-col h-full">
+          <div className="bg-white/90 backdrop-blur p-4 shadow-sm flex items-center justify-between pt-safe-top border-b border-gray-200">
+            <button onClick={() => setReviewData(null)} className="p-2 bg-gray-100 rounded-full"><ChevronLeft /></button>
+            <h2 className="font-bold text-lg">Conferma Dati</h2>
+            <div className="w-10"></div>
           </div>
-      )
+
+          <div className="flex-1 overflow-y-auto p-6 space-y-6 pb-24">
+            <div className="bg-white/90 backdrop-blur p-4 rounded-xl text-emerald-800 text-sm flex gap-3 items-center shadow-sm">
+              <Sparkles className="shrink-0 text-emerald-600" />
+              <p>Ho stimato questi valori. Correggili se necessario.</p>
+            </div>
+            <div>
+              <label className="text-xs font-bold text-white uppercase ml-1">Pasto</label>
+              <input value={reviewData.name} onChange={e => setReviewData({ ...reviewData, name: e.target.value })} className="w-full p-4 bg-white/95 backdrop-blur rounded-xl mt-1 font-bold text-lg shadow-sm border border-white/50" />
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div><label className="text-xs font-bold text-white uppercase ml-1">Kcal</label><input type="number" value={reviewData.calories} onChange={e => setReviewData({ ...reviewData, calories: Number(e.target.value) })} className="w-full p-4 bg-white/95 backdrop-blur rounded-xl mt-1 font-bold text-emerald-600 text-xl shadow-sm border border-white/50" /></div>
+              <div className="space-y-2">
+                <div className="bg-white/95 backdrop-blur p-2 rounded-lg shadow-sm flex justify-between text-sm"><span>Prot</span><input type="number" value={reviewData.protein} onChange={e => setReviewData({ ...reviewData, protein: Number(e.target.value) })} className="w-12 text-right font-bold text-blue-600 outline-none bg-transparent" /></div>
+                <div className="bg-white/95 backdrop-blur p-2 rounded-lg shadow-sm flex justify-between text-sm"><span>Carb</span><input type="number" value={reviewData.carbs} onChange={e => setReviewData({ ...reviewData, carbs: Number(e.target.value) })} className="w-12 text-right font-bold text-amber-600 outline-none bg-transparent" /></div>
+                <div className="bg-white/95 backdrop-blur p-2 rounded-lg shadow-sm flex justify-between text-sm"><span>Gras</span><input type="number" value={reviewData.fat} onChange={e => setReviewData({ ...reviewData, fat: Number(e.target.value) })} className="w-12 text-right font-bold text-rose-600 outline-none bg-transparent" /></div>
+              </div>
+            </div>
+          </div>
+
+          <div className="p-4 bg-white/90 backdrop-blur border-t border-gray-200 pb-safe">
+            <div className="flex gap-3">
+              <button onClick={() => setReviewData(null)} className="flex-1 py-4 font-bold text-gray-500 bg-gray-100 rounded-xl">Annulla</button>
+              <button onClick={saveLog} className="flex-[2] py-4 bg-emerald-600 text-white rounded-xl font-bold shadow-lg flex justify-center gap-2 items-center"><CheckCircle2 /> Salva</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    )
   }
 
   return (
@@ -640,40 +821,40 @@ function AddFood({ user, profile, close, apiKey }) {
       <div className="relative z-10 flex flex-col h-full">
         <div className="bg-white/90 backdrop-blur p-4 pt-safe-top flex justify-between items-center shadow-sm border-b border-gray-200">
           <h2 className="text-xl font-bold text-gray-800">Nuovo Pasto</h2>
-          <button onClick={close} className="bg-gray-100 p-2 rounded-full hover:bg-gray-200"><X size={20}/></button>
+          <button onClick={close} className="bg-gray-100 p-2 rounded-full hover:bg-gray-200"><X size={20} /></button>
         </div>
-        
+
         <div className="flex-1 flex flex-col p-4 overflow-y-auto pb-24">
           <div className="bg-white/90 backdrop-blur p-1 rounded-xl shadow-sm mb-6 flex border border-white/50">
-            <button onClick={() => setMode('camera')} className={`flex-1 py-2 rounded-lg text-sm font-bold transition-all ${mode==='camera'?'bg-emerald-100 text-emerald-700 shadow-sm':'text-gray-400'}`}>Foto</button>
-            <button onClick={() => setMode('text')} className={`flex-1 py-2 rounded-lg text-sm font-bold transition-all ${mode==='text'?'bg-emerald-100 text-emerald-700 shadow-sm':'text-gray-400'}`}>Testo</button>
+            <button onClick={() => setMode('camera')} className={`flex-1 py-2 rounded-lg text-sm font-bold transition-all ${mode === 'camera' ? 'bg-emerald-100 text-emerald-700 shadow-sm' : 'text-gray-400'}`}>Foto</button>
+            <button onClick={() => setMode('text')} className={`flex-1 py-2 rounded-lg text-sm font-bold transition-all ${mode === 'text' ? 'bg-emerald-100 text-emerald-700 shadow-sm' : 'text-gray-400'}`}>Testo</button>
           </div>
-          
+
           {mode === 'camera' ? (
             <div className="space-y-4">
-                <div onClick={() => fileRef.current.click()} className="h-64 border-2 border-dashed border-white/60 bg-white/30 backdrop-blur rounded-3xl flex flex-col items-center justify-center cursor-pointer relative hover:bg-white/40 transition-colors shadow-sm">
-                   <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={handleFile} />
-                   {image ? <img src={`data:image/jpeg;base64,${image}`} className="absolute inset-0 w-full h-full object-cover rounded-3xl"/> : <div className="flex flex-col items-center text-white"><Camera size={48} className="mb-2 drop-shadow-md"/><span className="font-bold drop-shadow-md">Scatta Foto</span></div>}
-                </div>
-                <div>
-                    <label className="text-xs font-bold text-white uppercase ml-1 drop-shadow-sm">Note (es. "Senza olio")</label>
-                    <input value={text} onChange={e => setText(e.target.value)} className="w-full p-4 bg-white/95 backdrop-blur rounded-xl mt-1 border border-white/50 shadow-sm focus:ring-2 ring-emerald-500 outline-none" />
-                </div>
+              <div onClick={() => fileRef.current.click()} className="h-64 border-2 border-dashed border-white/60 bg-white/30 backdrop-blur rounded-3xl flex flex-col items-center justify-center cursor-pointer relative hover:bg-white/40 transition-colors shadow-sm">
+                <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={handleFile} />
+                {image ? <img src={`data:image/jpeg;base64,${image}`} className="absolute inset-0 w-full h-full object-cover rounded-3xl" /> : <div className="flex flex-col items-center text-white"><Camera size={48} className="mb-2 drop-shadow-md" /><span className="font-bold drop-shadow-md">Scatta Foto</span></div>}
+              </div>
+              <div>
+                <label className="text-xs font-bold text-white uppercase ml-1 drop-shadow-sm">Note (es. "Senza olio")</label>
+                <input value={text} onChange={e => setText(e.target.value)} className="w-full p-4 bg-white/95 backdrop-blur rounded-xl mt-1 border border-white/50 shadow-sm focus:ring-2 ring-emerald-500 outline-none" />
+              </div>
             </div>
           ) : (
-            <textarea value={text} onChange={e=>setText(e.target.value)} className="w-full h-64 p-4 bg-white/95 backdrop-blur rounded-2xl border border-white/50 shadow-sm focus:ring-2 ring-emerald-500 text-lg placeholder-gray-400 resize-none" placeholder="Es: Pasta al pomodoro e una mela..." />
+            <textarea value={text} onChange={e => setText(e.target.value)} className="w-full h-64 p-4 bg-white/95 backdrop-blur rounded-2xl border border-white/50 shadow-sm focus:ring-2 ring-emerald-500 text-lg placeholder-gray-400 resize-none" placeholder="Es: Pasta al pomodoro e una mela..." />
           )}
         </div>
-        
+
         <div className="p-4 bg-white/90 backdrop-blur border-t border-gray-200 pb-safe">
           <div className="flex gap-3">
             <button onClick={close} className="px-6 py-4 rounded-xl font-bold text-gray-500 bg-gray-100 hover:bg-gray-200 transition-colors">Annulla</button>
-            <button 
-              onClick={analyze} 
-              disabled={loading || (mode==='camera' && !image) || (mode==='text' && !text)} 
+            <button
+              onClick={analyze}
+              disabled={loading || (mode === 'camera' && !image) || (mode === 'text' && !text)}
               className="flex-1 bg-emerald-600 text-white py-4 rounded-xl font-bold shadow-lg flex justify-center items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed hover:bg-emerald-700 transition-colors"
             >
-                {loading ? <Loader2 className="animate-spin"/> : <><ScanLine/> Analizza</>}
+              {loading ? <Loader2 className="animate-spin" /> : <><ScanLine /> Analizza</>}
             </button>
           </div>
         </div>
@@ -694,36 +875,36 @@ function UserProfile({ user, profile, setProfile, setAuthMode }) {
     return () => window.removeEventListener('beforeinstallprompt', handler);
   }, []);
 
-  const handleInstall = () => { if(installPrompt) installPrompt.prompt(); };
+  const handleInstall = () => { if (installPrompt) installPrompt.prompt(); };
   const save = async () => { await setDoc(doc(db, 'artifacts', appId, 'users', user.uid, 'profile', 'main'), formData); setProfile(formData); alert("Salvato!"); };
-  const logWeight = async () => { if(newWeight) { await addDoc(collection(db, 'artifacts', appId, 'users', user.uid, 'measurements'), { weight: parseFloat(newWeight), date: new Date().toISOString().split('T')[0] }); setNewWeight(''); alert("Salvato!"); }};
+  const logWeight = async () => { if (newWeight) { await addDoc(collection(db, 'artifacts', appId, 'users', user.uid, 'measurements'), { weight: parseFloat(newWeight), date: new Date().toISOString().split('T')[0] }); setNewWeight(''); alert("Salvato!"); } };
 
   return (
     <div className="pb-24 space-y-6">
       <div className="flex justify-between items-center text-white pt-2">
-          <h1 className="text-2xl font-bold">Profilo</h1>
-          <button onClick={async () => { await signOut(auth); setAuthMode('login'); }} className="text-white bg-white/20 p-2 rounded-full hover:bg-white/30"><LogOut size={20}/></button>
+        <h1 className="text-2xl font-bold">Profilo</h1>
+        <button onClick={async () => { await signOut(auth); setAuthMode('login'); }} className="text-white bg-white/20 p-2 rounded-full hover:bg-white/30"><LogOut size={20} /></button>
       </div>
 
       {installPrompt && (
         <div className="bg-emerald-500 text-white p-4 rounded-2xl shadow-lg flex justify-between items-center animate-in slide-in-from-top">
-           <div><div className="font-bold">Installa App</div><div className="text-xs opacity-90">Accesso rapido dalla home</div></div>
-           <button onClick={handleInstall} className="bg-white text-emerald-600 px-4 py-2 rounded-xl font-bold text-sm flex items-center gap-2"><Download size={16}/> Installa</button>
+          <div><div className="font-bold">Installa App</div><div className="text-xs opacity-90">Accesso rapido dalla home</div></div>
+          <button onClick={handleInstall} className="bg-white text-emerald-600 px-4 py-2 rounded-xl font-bold text-sm flex items-center gap-2"><Download size={16} /> Installa</button>
         </div>
       )}
 
       <div className="bg-white/95 backdrop-blur p-6 rounded-3xl shadow-xl space-y-4 border border-white/50">
         <h3 className="font-bold text-gray-800">I tuoi dati</h3>
         <div className="grid grid-cols-2 gap-4">
-          <Input label="Età" val={formData.age} onChange={v => setFormData({...formData, age: v})} />
-          <Input label="Altezza" val={formData.height} onChange={v => setFormData({...formData, height: v})} />
+          <Input label="Età" val={formData.age} onChange={v => setFormData({ ...formData, age: v })} />
+          <Input label="Altezza" val={formData.height} onChange={v => setFormData({ ...formData, height: v })} />
         </div>
-        <Input label="Peso (kg)" val={formData.weight} onChange={v => setFormData({...formData, weight: v})} />
+        <Input label="Peso (kg)" val={formData.weight} onChange={v => setFormData({ ...formData, weight: v })} />
         <button onClick={save} className="w-full bg-gray-900 text-white py-4 rounded-xl font-bold hover:bg-gray-800">Salva Modifiche</button>
       </div>
 
       <div className="bg-emerald-50 p-6 rounded-3xl border border-emerald-100 shadow-sm">
-        <h3 className="font-bold text-emerald-900 mb-4 flex items-center gap-2"><Scale size={18}/> Aggiorna Peso</h3>
+        <h3 className="font-bold text-emerald-900 mb-4 flex items-center gap-2"><Scale size={18} /> Aggiorna Peso</h3>
         <div className="flex gap-3">
           <input type="number" placeholder="kg" value={newWeight} onChange={e => setNewWeight(e.target.value)} className="w-24 p-3 rounded-xl text-center font-bold text-lg bg-white border border-emerald-100 outline-none focus:ring-2 ring-emerald-500" />
           <button onClick={logWeight} className="flex-1 bg-emerald-600 text-white rounded-xl font-bold shadow-md hover:bg-emerald-700">Registra</button>
@@ -733,4 +914,4 @@ function UserProfile({ user, profile, setProfile, setAuthMode }) {
   );
 }
 
-const Input = ({ label, val, onChange }) => ( <div><label className="text-xs text-gray-500 font-bold ml-1 uppercase">{label}</label><input type="number" value={val} onChange={e => onChange(e.target.value)} className="w-full p-4 bg-gray-50 rounded-xl mt-1 focus:ring-2 ring-emerald-500 outline-none border border-gray-100" /></div> );
+const Input = ({ label, val, onChange }) => (<div><label className="text-xs text-gray-500 font-bold ml-1 uppercase">{label}</label><input type="number" value={val} onChange={e => onChange(e.target.value)} className="w-full p-4 bg-gray-50 rounded-xl mt-1 focus:ring-2 ring-emerald-500 outline-none border border-gray-100" /></div>);
