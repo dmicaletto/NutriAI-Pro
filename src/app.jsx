@@ -122,16 +122,11 @@ export default function NutriAIPro() {
       } catch (e) { console.warn(e); }
 
       try {
-        const envKey = import.meta.env.VITE_GEMINI_API_KEY;
-        if (envKey) {
-          setApiKey(envKey);
+        const keySnap = await getDoc(doc(db, 'artifacts', appId, 'public', 'data', 'config', 'secrets'));
+        if (keySnap.exists() && keySnap.data().gemini_key) {
+          setApiKey(keySnap.data().gemini_key);
         } else {
-          const keySnap = await getDoc(doc(db, 'artifacts', appId, 'public', 'data', 'config', 'secrets'));
-          if (keySnap.exists() && keySnap.data().gemini_key) {
-            setApiKey(keySnap.data().gemini_key);
-          } else {
-            setApiKey("");
-          }
+          setApiKey("");
         }
       } catch (e) { console.error(e); setApiKey(""); }
 
