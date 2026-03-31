@@ -3,8 +3,10 @@ import { doc, getDoc, setDoc } from 'firebase/firestore';
 import { ChevronLeft, Loader2, X, PieChart, Sparkles, CheckCircle2 } from 'lucide-react';
 import { db, appId } from '../firebase';
 import { callGemini } from '../utils/gemini';
+import { useApp } from '../context/AppContext';
 
-export default function WeeklyPlanner({ user, profile, apiKey }) {
+export default function WeeklyPlanner() {
+  const { user, profile, apiKey } = useApp();
   const [weekPlan, setWeekPlan] = useState(null);
   const [showWizard, setShowWizard] = useState(false);
   const [loading, setLoading] = useState(false);

@@ -3,9 +3,11 @@ import { collection, query, where, orderBy, onSnapshot } from 'firebase/firestor
 import { Scale, TrendingUp } from 'lucide-react';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer, AreaChart, Area } from 'recharts';
 import { db, appId } from '../firebase';
+import { useApp } from '../context/AppContext';
 import TooltipCustom from './ui/TooltipCustom';
 
-export default function TrendsAnalytics({ user }) {
+export default function TrendsAnalytics() {
+  const { user } = useApp();
   const [history, setHistory] = useState([]);
   const [weightHistory, setWeightHistory] = useState([]);
 

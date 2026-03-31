@@ -3,9 +3,11 @@ import { doc, setDoc, addDoc, collection } from 'firebase/firestore';
 import { signOut } from 'firebase/auth';
 import { LogOut, Scale, Download } from 'lucide-react';
 import { auth, db, appId } from '../firebase';
+import { useApp } from '../context/AppContext';
 import Input from './ui/Input';
 
-export default function UserProfile({ user, profile, setProfile, setAuthMode }) {
+export default function UserProfile() {
+  const { user, profile, setProfile, setAuthMode } = useApp();
   const [formData, setFormData] = useState(profile);
   const [newWeight, setNewWeight] = useState('');
   const [installPrompt, setInstallPrompt] = useState(null);

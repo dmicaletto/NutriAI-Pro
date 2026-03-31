@@ -3,6 +3,7 @@ import { onAuthStateChanged, signInWithCustomToken } from 'firebase/auth';
 import { doc, getDoc } from 'firebase/firestore';
 import { Plus, PieChart, Calendar, TrendingUp, User, Loader2, AlertTriangle } from 'lucide-react';
 import { auth, db, appId } from './firebase';
+import { AppContext } from './context/AppContext';
 import AuthScreen from './components/AuthScreen';
 import DailyView from './components/DailyView';
 import WeeklyPlanner from './components/WeeklyPlanner';
@@ -75,7 +76,10 @@ export default function NutriAIPro() {
 
   if (loadingKey) return <div className="h-screen flex flex-col items-center justify-center bg-emerald-600 text-white"><Loader2 className="animate-spin mb-2" size={40} /><p className="text-sm opacity-80">Caricamento NutriAI...</p></div>;
 
+  const contextValue = { user, apiKey, setApiKey, profile, setProfile, setActiveTab, setAuthMode };
+
   return (
+    <AppContext.Provider value={contextValue}>
     <div className="relative min-h-screen font-sans text-gray-800 pb-24 md:max-w-md md:mx-auto md:shadow-2xl md:min-h-screen md:border-x border-gray-200 bg-gray-50">
 
       <BackgroundPattern />
@@ -101,14 +105,14 @@ export default function NutriAIPro() {
         )}
 
         <div className="animate-in fade-in duration-300">
-          {activeTab === 'daily' && <DailyView user={user} profile={profile} setActiveTab={setActiveTab} apiKey={apiKey} />}
-          {activeTab === 'planner' && <WeeklyPlanner user={user} profile={profile} apiKey={apiKey} />}
-          {activeTab === 'trends' && <TrendsAnalytics user={user} />}
-          {activeTab === 'profile' && <UserProfile user={user} profile={profile} setProfile={setProfile} setAuthMode={setAuthMode} />}
+          {activeTab === 'daily' && <DailyView />}
+          {activeTab === 'planner' && <WeeklyPlanner />}
+          {activeTab === 'trends' && <TrendsAnalytics />}
+          {activeTab === 'profile' && <UserProfile />}
         </div>
       </div>
 
-      {activeTab === 'add' && <AddFood user={user} profile={profile} close={() => setActiveTab('daily')} apiKey={apiKey} />}
+      {activeTab === 'add' && <AddFood />}
 
       <div className="fixed bottom-0 left-0 right-0 md:w-full md:max-w-md md:mx-auto bg-white/95 backdrop-blur-md border-t border-gray-200 px-6 py-3 flex justify-between items-end z-50 pb-safe shadow-lg-up rounded-t-3xl">
         <NavBtn icon={<PieChart size={22} />} label="Oggi" active={activeTab === 'daily'} onClick={() => setActiveTab('daily')} />
@@ -125,5 +129,6 @@ export default function NutriAIPro() {
         <NavBtn icon={<User size={22} />} label="Tu" active={activeTab === 'profile'} onClick={() => setActiveTab('profile')} />
       </div>
     </div>
+    </AppContext.Provider>
   );
 }

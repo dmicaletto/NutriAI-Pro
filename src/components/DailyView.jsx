@@ -3,9 +3,11 @@ import { collection, query, where, onSnapshot, addDoc, deleteDoc, doc } from 'fi
 import { Plus, X, ChevronLeft, Loader2, ChefHat, Sparkles } from 'lucide-react';
 import { db, appId } from '../firebase';
 import { callGemini } from '../utils/gemini';
+import { useApp } from '../context/AppContext';
 import MacroPill from './ui/MacroPill';
 
-export default function DailyView({ user, profile, setActiveTab, apiKey }) {
+export default function DailyView() {
+  const { user, profile, setActiveTab, apiKey } = useApp();
   const [logs, setLogs] = useState([]);
   const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
   const [ingredients, setIngredients] = useState('');

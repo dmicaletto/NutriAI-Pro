@@ -3,9 +3,12 @@ import { collection, addDoc } from 'firebase/firestore';
 import { Camera, X, ChevronLeft, Loader2, ScanLine, CheckCircle2, Sparkles } from 'lucide-react';
 import { db, appId } from '../firebase';
 import { callGemini } from '../utils/gemini';
+import { useApp } from '../context/AppContext';
 import BackgroundPattern from './ui/BackgroundPattern';
 
-export default function AddFood({ user, profile, close, apiKey }) {
+export default function AddFood() {
+  const { user, profile, apiKey, setActiveTab } = useApp();
+  const close = () => setActiveTab('daily');
   const [mode, setMode] = useState('camera');
   const [image, setImage] = useState(null);
   const [text, setText] = useState('');
