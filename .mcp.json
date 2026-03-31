@@ -1,0 +1,15 @@
+{
+  "mcpServers": {
+    "firebase": {
+      "command": "C:\\Program Files\\nodejs\\npx.cmd",
+      "args": [
+        "-y",
+        "firebase-tools@latest",
+        "experimental:mcp",
+        "--dir",
+        "C:\\Users\\smartwk\\GitHub\\NutriAI-Pro"
+      ],
+      "env": {}
+    }
+  }
+}

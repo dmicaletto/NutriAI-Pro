@@ -1,0 +1,12 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(find /c/Users/smartwk/GitHub/NutriAI-Pro -maxdepth 2 -type f \\\\\\(-name .mcp.json -o -name firebase.json -o -name firestore.indexes.json -o -name .env* -o -name vite.config.js -o -name MEMORY.md \\\\\\))",
+      "Bash(find . -not -path */.* -not -path */node_modules/* -type f)",
+      "Bash(\"C:\\\\Program Files\\\\nodejs\\\\npx.cmd\" -y firebase-tools@latest --version)",
+      "Bash(\"C:\\\\Program Files\\\\nodejs\\\\npx.cmd\" -y firebase-tools@latest login:list)",
+      "Bash(npx vite:*)",
+      "Bash(npm install:*)"
+    ]
+  }
+}
