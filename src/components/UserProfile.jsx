@@ -43,10 +43,10 @@ export default function UserProfile() {
           <Input label="Cognome" val={formData.lastName} onChange={v => setFormData({ ...formData, lastName: v })} />
         </div>
         <div className="grid grid-cols-2 gap-4">
-          <Input label="Età" val={formData.age} onChange={v => setFormData({ ...formData, age: v })} />
-          <Input label="Altezza" val={formData.height} onChange={v => setFormData({ ...formData, height: v })} />
+          <Input label="Età" type="number" val={formData.age} onChange={v => setFormData({ ...formData, age: v })} />
+          <Input label="Altezza" type="number" val={formData.height} onChange={v => setFormData({ ...formData, height: v })} />
         </div>
-        <Input label="Peso (kg)" val={formData.weight} onChange={v => setFormData({ ...formData, weight: v })} />
+        <Input label="Peso (kg)" type="number" val={formData.weight} onChange={v => setFormData({ ...formData, weight: v })} />
         <button onClick={save} className="w-full bg-gray-900 text-white py-4 rounded-xl font-bold hover:bg-gray-800">Salva Modifiche</button>
       </div>
 
