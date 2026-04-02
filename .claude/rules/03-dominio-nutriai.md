@@ -7,7 +7,7 @@ title: Dominio NutriAI-Pro
 ## Entità Principali
 
 ### Profilo Utente (`profile/main`)
-Anagrafica e obiettivo nutrizionale. Campi: `name`, `age`, `weight`, `height`, `goal`, `gender`.
+Anagrafica e obiettivo nutrizionale. Campi: `firstName`, `lastName`, `age`, `weight`, `height`, `goal`, `gender`.
 
 ### Assessment (`profile/assessment`)
 Questionario preferenze per il planner settimanale. Campi:
@@ -26,6 +26,11 @@ Singolo pasto registrato. Campi: `name`, `calories`, `protein`, `carbs`, `fat`, 
 
 ### Misurazione (`measurements/{autoId}`)
 Peso registrato. Campi: `weight` (numero), `date` (`YYYY-MM-DD`).
+
+### Attività Sportiva (`activity_logs/{autoId}`)
+Attività fisica giornaliera. Campi: `name`, `met` (coefficiente MET), `duration` (minuti), `caloriesBurned`, `date` (`YYYY-MM-DD`), `timestamp`.
+- `caloriesBurned` = `Math.round(met × weight_kg × duration_hours)` — formula MET offline.
+- Le calorie bruciate aumentano il `targetCals` giornaliero in `DailyView`.
 
 ### Piano Settimanale (`plans/current_week`)
 Documento singolo con 7 chiavi giorno (`lunedì`..`domenica`). Ogni giorno contiene:

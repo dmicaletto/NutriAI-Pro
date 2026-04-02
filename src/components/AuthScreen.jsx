@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { signInWithEmailAndPassword, createUserWithEmailAndPassword, signInAnonymously } from 'firebase/auth';
+import { signInWithEmailAndPassword, createUserWithEmailAndPassword } from 'firebase/auth';
 import { Mail, Lock, Loader2, Scale } from 'lucide-react';
 import { auth } from '../firebase';
 import BackgroundPattern from './ui/BackgroundPattern';
@@ -52,9 +52,6 @@ export default function AuthScreen({ mode, setMode }) {
           <div className="mt-6 text-center text-sm text-gray-500">
             {mode === 'login' ? "Nuovo qui? " : "Hai già un account? "}
             <button onClick={() => setMode(mode === 'login' ? 'register' : 'login')} className="text-emerald-600 font-bold hover:underline">{mode === 'login' ? "Registrati" : "Accedi"}</button>
-          </div>
-          <div className="mt-6 border-t border-gray-100 pt-4 text-center">
-            <button onClick={async () => { setLoading(true); try { await signInAnonymously(auth); } catch (e) { setError(e.message); setLoading(false); } }} className="text-gray-400 text-xs hover:text-gray-600 underline">Continua come ospite</button>
           </div>
         </div>
       </div>

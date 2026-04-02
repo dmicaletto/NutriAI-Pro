@@ -6,6 +6,7 @@ title: Regole Architettura — NutriAI-Pro
 
 ## Regole Generali Claude
 
+- **Efficienza token**: non rileggere file già letti nella sessione. Usare `offset`+`limit` per file grandi. Non ripetere blocchi di codice già mostrati se non modificati. Preferire `Edit` a `Write` per modifiche parziali.
 - **NO commit automatici**: l'utente gestisce autonomamente tutte le operazioni git.
 - **NO push, NO force-push**: mai, in nessun caso.
 - **NO test automatici**: non eseguire mai `npm run lint`, `npm run build`, `npm test` o qualsiasi altro comando di verifica in autonomia. Proponi sempre il comando e attendi approvazione esplicita prima di eseguirlo.

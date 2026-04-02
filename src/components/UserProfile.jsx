@@ -39,6 +39,10 @@ export default function UserProfile() {
       <div className="bg-white/95 backdrop-blur p-6 rounded-3xl shadow-xl space-y-4 border border-white/50">
         <h3 className="font-bold text-gray-800">I tuoi dati</h3>
         <div className="grid grid-cols-2 gap-4">
+          <Input label="Nome" val={formData.firstName} onChange={v => setFormData({ ...formData, firstName: v })} />
+          <Input label="Cognome" val={formData.lastName} onChange={v => setFormData({ ...formData, lastName: v })} />
+        </div>
+        <div className="grid grid-cols-2 gap-4">
           <Input label="Età" val={formData.age} onChange={v => setFormData({ ...formData, age: v })} />
           <Input label="Altezza" val={formData.height} onChange={v => setFormData({ ...formData, height: v })} />
         </div>

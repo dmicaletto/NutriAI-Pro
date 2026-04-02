@@ -5,6 +5,7 @@ import { db, appId } from '../firebase';
 import { callGemini } from '../utils/gemini';
 import { useApp } from '../context/AppContext';
 import MacroPill from './ui/MacroPill';
+import ActivitySection from './ActivitySection';
 
 export default function DailyView() {
   const { user, profile, setActiveTab, apiKey } = useApp();
@@ -16,9 +17,10 @@ export default function DailyView() {
   const [showInstructions, setShowInstructions] = useState(false);
   const [loadingRecipe, setLoadingRecipe] = useState(false);
   const [viewingMeal, setViewingMeal] = useState(null);
+  const [totalBurned, setTotalBurned] = useState(0);
 
   const bmr = profile.weight ? (10 * profile.weight) + (6.25 * profile.height) - (5 * profile.age) + (profile.gender === 'Uomo' ? 5 : -161) : 2000;
-  const targetCals = Math.round(bmr * (profile.goal === 'Dimagrimento' ? 1.1 : profile.goal === 'Aumento Massa' ? 1.4 : 1.2));
+  const targetCals = Math.round(bmr * (profile.goal === 'Dimagrimento' ? 1.1 : profile.goal === 'Aumento Massa' ? 1.4 : 1.2)) + totalBurned;
 
   useEffect(() => {
     const q = query(collection(db, 'artifacts', appId, 'users', user.uid, 'food_logs'), where("date", "==", date));
@@ -64,7 +66,7 @@ export default function DailyView() {
     <div className="space-y-6">
       <header className="flex justify-between items-center pt-2 text-white/90">
         <div>
-          <h1 className="text-2xl font-bold text-white shadow-sm">Ciao, {profile.name || 'Utente'}</h1>
+          <h1 className="text-2xl font-bold text-white shadow-sm">Ciao, {profile.firstName || 'Utente'}</h1>
           <p className="text-emerald-100 text-sm">{new Date(date).toLocaleDateString('it-IT', { weekday: 'long', day: 'numeric', month: 'long' })}</p>
         </div>
         <input type="date" value={date} onChange={e => setDate(e.target.value)} className="bg-white/20 backdrop-blur border border-white/30 rounded-lg p-2 text-sm text-white placeholder-white" />
@@ -150,6 +152,8 @@ export default function DailyView() {
           </div>
         )}
       </div>
+
+      <ActivitySection date={date} onBurnedUpdate={setTotalBurned} />
 
       <div className="pb-20">
         <h2 className="font-bold text-white mb-3 text-lg drop-shadow-md">Pasti registrati</h2>
