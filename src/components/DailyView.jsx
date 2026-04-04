@@ -1,14 +1,15 @@
 import React, { useState, useEffect } from 'react';
-import { collection, query, where, onSnapshot, addDoc, deleteDoc, doc } from 'firebase/firestore';
-import { Plus, X, ChevronLeft, Loader2, ChefHat, Sparkles } from 'lucide-react';
+import { collection, query, where, onSnapshot, addDoc, deleteDoc, doc, getDocs } from 'firebase/firestore';
+import { Plus, X, ChevronLeft, Loader2, ChefHat, Sparkles, Brain } from 'lucide-react';
 import { db, appId } from '../firebase';
 import { callGemini } from '../utils/gemini';
 import { useApp } from '../context/AppContext';
 import MacroPill from './ui/MacroPill';
 import ActivitySection from './ActivitySection';
+import AdvisorToast from './AdvisorToast';
 
 export default function DailyView() {
-  const { user, profile, setActiveTab, apiKey } = useApp();
+  const { user, profile, setActiveTab, apiKey, advisorMessage, setAdvisorMessage } = useApp();
   const [logs, setLogs] = useState([]);
   const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
   const [ingredients, setIngredients] = useState('');
@@ -18,6 +19,10 @@ export default function DailyView() {
   const [loadingRecipe, setLoadingRecipe] = useState(false);
   const [viewingMeal, setViewingMeal] = useState(null);
   const [totalBurned, setTotalBurned] = useState(0);
+  const [morningTip, setMorningTip] = useState(null);
+  const [morningTipDismissed, setMorningTipDismissed] = useState(false);
+  const [dailyAnalysis, setDailyAnalysis] = useState(null);
+  const [loadingAnalysis, setLoadingAnalysis] = useState(false);
 
   const bmr = profile.weight ? (10 * profile.weight) + (6.25 * profile.height) - (5 * profile.age) + (profile.gender === 'Uomo' ? 5 : -161) : 2000;
   const targetCals = Math.round(bmr * (profile.goal === 'Dimagrimento' ? 1.1 : profile.goal === 'Aumento Massa' ? 1.4 : 1.2)) + totalBurned;
@@ -26,6 +31,42 @@ export default function DailyView() {
     const q = query(collection(db, 'artifacts', appId, 'users', user.uid, 'food_logs'), where("date", "==", date));
     return onSnapshot(q, (snap) => setLogs(snap.docs.map(d => ({ id: d.id, ...d.data() }))));
   }, [user, date]);
+
+  useEffect(() => {
+    const today = new Date().toISOString().split('T')[0];
+    const hour = new Date().getHours();
+    const cachedDate = localStorage.getItem('nutriai_tip_date');
+    const cachedTip = localStorage.getItem('nutriai_morning_tip');
+    if (cachedDate === today && cachedTip) { setMorningTip(cachedTip); return; }
+    if (hour < 6 || hour >= 11 || !apiKey) return;
+    const yesterday = new Date(); yesterday.setDate(yesterday.getDate() - 1);
+    const yestStr = yesterday.toISOString().split('T')[0];
+    getDocs(query(collection(db, 'artifacts', appId, 'users', user.uid, 'food_logs'), where('date', '==', yestStr)))
+      .then(snap => {
+        const yestCals = snap.docs.reduce((s, d) => s + (d.data().calories || 0), 0);
+        const prompt = `Sei un nutrizionista. Obiettivo utente: ${profile.goal}. Ieri ha consumato ${yestCals} kcal. Dammi 1 consiglio pratico e motivante per oggi (max 2 righe). Solo il consiglio, nessun prefisso.`;
+        return callGemini(prompt, apiKey, null, false);
+      })
+      .then(tip => {
+        if (!tip) return;
+        const t = tip.trim();
+        setMorningTip(t);
+        localStorage.setItem('nutriai_morning_tip', t);
+        localStorage.setItem('nutriai_tip_date', today);
+      })
+      .catch(e => console.error('Morning tip error:', e));
+  }, [user, apiKey]);
+
+  const analyzeDay = async () => {
+    if (!apiKey || loadingAnalysis) return;
+    setLoadingAnalysis(true);
+    setDailyAnalysis(null);
+    const mealsList = logs.map(l => `${l.name} (${l.calories} kcal, P:${l.protein}g, C:${l.carbs}g, G:${l.fat}g)`).join('; ');
+    const prompt = `Nutrizionista. Analisi giornata alimentare. Obiettivo: ${profile.goal}. Target: ${targetCals} kcal. Consumate: ${stats.cals} kcal. Pasti: ${mealsList || 'nessuno'}. Analisi concisa: punti positivi, carenze, 1 suggerimento pratico. Max 4 righe in italiano.`;
+    const result = await callGemini(prompt, apiKey, null, false);
+    setDailyAnalysis(result ? result.trim() : 'Analisi non disponibile.');
+    setLoadingAnalysis(false);
+  };
 
   const stats = logs.reduce((acc, l) => ({
     cals: acc.cals + (l.calories || 0),
@@ -72,6 +113,14 @@ export default function DailyView() {
         <input type="date" value={date} onChange={e => setDate(e.target.value)} className="bg-white/20 backdrop-blur border border-white/30 rounded-lg p-2 text-sm text-white placeholder-white" />
       </header>
 
+      {morningTip && !morningTipDismissed && (
+        <div className="bg-emerald-700/80 backdrop-blur rounded-2xl px-4 py-3 flex gap-3 items-start animate-in fade-in duration-300">
+          <Brain size={18} className="text-emerald-200 shrink-0 mt-0.5" />
+          <p className="text-sm text-white flex-1 leading-snug">{morningTip}</p>
+          <button onClick={() => setMorningTipDismissed(true)} className="text-emerald-300 hover:text-white shrink-0 transition-colors"><X size={16} /></button>
+        </div>
+      )}
+
       <div className="bg-white/95 backdrop-blur rounded-3xl p-6 shadow-xl border border-white/50">
         <div className="flex justify-between items-end mb-4">
           <div>
@@ -90,6 +139,18 @@ export default function DailyView() {
           <MacroPill label="Prot" val={stats.prot} total={150} color="bg-blue-500" />
           <MacroPill label="Carb" val={stats.carb} total={250} color="bg-amber-500" />
           <MacroPill label="Grassi" val={stats.fat} total={70} color="bg-rose-500" />
+        </div>
+        <div className="mt-4 pt-3 border-t border-gray-100">
+          <button onClick={analyzeDay} disabled={loadingAnalysis || logs.length === 0}
+            className="w-full text-xs text-gray-400 flex items-center justify-center gap-1.5 hover:text-emerald-600 transition-colors disabled:opacity-40 font-medium">
+            {loadingAnalysis ? <Loader2 size={14} className="animate-spin" /> : <Brain size={14} />}
+            Analizza la mia giornata
+          </button>
+          {dailyAnalysis && (
+            <div className="mt-3 text-xs text-gray-600 leading-relaxed bg-emerald-50/60 p-3 rounded-xl border border-emerald-100 animate-in fade-in duration-300">
+              {dailyAnalysis}
+            </div>
+          )}
         </div>
       </div>
 
@@ -191,6 +252,8 @@ export default function DailyView() {
           </div>
         )}
       </div>
+
+      <AdvisorToast message={advisorMessage} onDismiss={() => setAdvisorMessage(null)} />
 
       {viewingMeal && (
         <div className="fixed inset-0 z-[100] bg-black/60 backdrop-blur-sm flex items-end justify-center animate-in fade-in duration-200" onClick={() => setViewingMeal(null)}>

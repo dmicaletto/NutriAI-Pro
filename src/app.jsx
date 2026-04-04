@@ -20,6 +20,7 @@ export default function NutriAIPro() {
   const [apiKey, setApiKey] = useState(null);
   const [authMode, setAuthMode] = useState('app');
   const [loadingKey, setLoadingKey] = useState(true);
+  const [advisorMessage, setAdvisorMessage] = useState(null);
 
   // 1. Init Auth Listener
   useEffect(() => {
@@ -76,7 +77,7 @@ export default function NutriAIPro() {
 
   if (loadingKey) return <div className="h-screen flex flex-col items-center justify-center bg-emerald-600 text-white"><Loader2 className="animate-spin mb-2" size={40} /><p className="text-sm opacity-80">Caricamento NutriAI...</p></div>;
 
-  const contextValue = { user, apiKey, setApiKey, profile, setProfile, setActiveTab, setAuthMode };
+  const contextValue = { user, apiKey, setApiKey, profile, setProfile, setActiveTab, setAuthMode, advisorMessage, setAdvisorMessage };
 
   return (
     <AppContext.Provider value={contextValue}>

@@ -1,5 +1,5 @@
 import React, { useState, useRef } from 'react';
-import { collection, addDoc } from 'firebase/firestore';
+import { collection, addDoc, getDocs, query, where } from 'firebase/firestore';
 import { Camera, X, ChevronLeft, Loader2, ScanLine, CheckCircle2, Sparkles } from 'lucide-react';
 import { db, appId } from '../firebase';
 import { callGemini } from '../utils/gemini';
@@ -7,7 +7,7 @@ import { useApp } from '../context/AppContext';
 import BackgroundPattern from './ui/BackgroundPattern';
 
 export default function AddFood() {
-  const { user, profile, apiKey, setActiveTab } = useApp();
+  const { user, profile, apiKey, setActiveTab, setAdvisorMessage } = useApp();
   const close = () => setActiveTab('daily');
   const [mode, setMode] = useState('camera');
   const [image, setImage] = useState(null);
@@ -32,8 +32,30 @@ export default function AddFood() {
 
   const saveLog = async () => {
     if (!reviewData) return;
-    await addDoc(collection(db, 'artifacts', appId, 'users', user.uid, 'food_logs'), { ...reviewData, date: new Date().toISOString().split('T')[0], timestamp: new Date().toISOString() });
+    const today = new Date().toISOString().split('T')[0];
+    await addDoc(collection(db, 'artifacts', appId, 'users', user.uid, 'food_logs'), { ...reviewData, date: today, timestamp: new Date().toISOString() });
     close();
+    analyzeAndNotify(reviewData, today);
+  };
+
+  const analyzeAndNotify = async (meal, date) => {
+    if (!apiKey) return;
+    try {
+      const snap = await getDocs(query(
+        collection(db, 'artifacts', appId, 'users', user.uid, 'food_logs'),
+        where('date', '==', date)
+      ));
+      const totalCals = snap.docs.reduce((s, d) => s + (d.data().calories || 0), 0);
+      const bmr = profile.weight
+        ? (10 * profile.weight) + (6.25 * profile.height) - (5 * profile.age) + (profile.gender === 'Uomo' ? 5 : -161)
+        : 2000;
+      const targetCals = Math.round(bmr * (profile.goal === 'Dimagrimento' ? 1.1 : profile.goal === 'Aumento Massa' ? 1.4 : 1.2));
+      const prompt = `Sei un nutrizionista. L'utente ha appena registrato: ${meal.name} (${meal.calories} kcal, P:${meal.protein}g, C:${meal.carbs}g, G:${meal.fat}g). Totale giornaliero: ${totalCals} kcal su ${targetCals} kcal target. Obiettivo: ${profile.goal}. Dai un commento brevissimo e amichevole (max 1 frase). Rispondi solo con la frase.`;
+      const result = await callGemini(prompt, apiKey, null, false);
+      if (result) setAdvisorMessage(result.trim());
+    } catch (e) {
+      console.error('Advisor meal error:', e);
+    }
   };
 
   const handleFile = (e) => {
