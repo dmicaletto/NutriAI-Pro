@@ -8,9 +8,8 @@ export default defineConfig({
     port: 3000,
     strictPort: true,
   },
-  // IMPORTANTE: Sostituisci '/NutriAI-Pro/' con il nome esatto del tuo repository GitHub tra due slash.
-  // Questo risolve i problemi di caricamento degli asset (404).
-  base: '/NutriAI-Pro/',
+  // './' usa percorsi relativi: compatibile con GitHub Pages e Capacitor Android.
+  base: './',
   build: {
     outDir: 'dist',
     assetsDir: 'assets',

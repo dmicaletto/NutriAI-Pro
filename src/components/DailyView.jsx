@@ -6,6 +6,7 @@ import { callGemini } from '../utils/gemini';
 import { useApp } from '../context/AppContext';
 import MacroPill from './ui/MacroPill';
 import ActivitySection from './ActivitySection';
+import SupplementCheckin from './SupplementCheckin';
 import AdvisorToast from './AdvisorToast';
 
 export default function DailyView() {
@@ -215,6 +216,8 @@ export default function DailyView() {
       </div>
 
       <ActivitySection date={date} onBurnedUpdate={setTotalBurned} />
+
+      <SupplementCheckin date={date} />
 
       <div className="pb-20">
         <h2 className="font-bold text-white mb-3 text-lg drop-shadow-md">Pasti registrati</h2>

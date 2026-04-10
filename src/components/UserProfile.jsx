@@ -5,6 +5,7 @@ import { LogOut, Scale, Download } from 'lucide-react';
 import { auth, db, appId } from '../firebase';
 import { useApp } from '../context/AppContext';
 import Input from './ui/Input';
+import SupplementManager from './SupplementManager';
 
 export default function UserProfile() {
   const { user, profile, setProfile, setAuthMode } = useApp();
@@ -49,6 +50,8 @@ export default function UserProfile() {
         <Input label="Peso (kg)" type="number" val={formData.weight} onChange={v => setFormData({ ...formData, weight: v })} />
         <button onClick={save} className="w-full bg-gray-900 text-white py-4 rounded-xl font-bold hover:bg-gray-800">Salva Modifiche</button>
       </div>
+
+      <SupplementManager />
 
       <div className="bg-emerald-50 p-6 rounded-3xl border border-emerald-100 shadow-sm">
         <h3 className="font-bold text-emerald-900 mb-4 flex items-center gap-2"><Scale size={18} /> Aggiorna Peso</h3>

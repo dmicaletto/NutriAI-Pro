@@ -32,6 +32,14 @@ Attività fisica giornaliera. Campi: `name`, `met` (coefficiente MET), `duration
 - `caloriesBurned` = `Math.round(met × weight_kg × duration_hours)` — formula MET offline.
 - Le calorie bruciate aumentano il `targetCals` giornaliero in `DailyView`.
 
+### Supplemento (`supplements/{autoId}`)
+Catalogo personale dei supplementi. Campi: `name`, `defaultDose` (numero), `unit` (mg/mcg/g/UI/cps/ml), `createdAt`.
+- Gestito in `UserProfile` tramite `SupplementManager`.
+
+### Assunzione Supplemento (`supplement_logs/{autoId}`)
+Assunzione giornaliera. Campi: `supplementId`, `name`, `dose`, `unit`, `date` (`YYYY-MM-DD`), `timestamp`.
+- Check-in giornaliero in `DailyView` tramite `SupplementCheckin` (toggle preso/da prendere).
+
 ### Piano Settimanale (`plans/current_week`)
 Documento singolo con 7 chiavi giorno (`lunedì`..`domenica`). Ogni giorno contiene:
 `{colazione, pranzo, cena, totale_cal}`.
