@@ -131,5 +131,5 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           # Il nome dell'artifact includerà la versione (es. TrainerPro-v1.0.0)
-          name: TrainerPro-${{ env.VERSION }}
+          name: NutriAI-Pro-${{ env.VERSION }}
           path: android/app/build/outputs/apk/debug/app-debug.apk
