@@ -41,16 +41,24 @@ export default function AddFood() {
   const analyzeAndNotify = async (meal, date) => {
     if (!apiKey) return;
     try {
-      const snap = await getDocs(query(
-        collection(db, 'artifacts', appId, 'users', user.uid, 'food_logs'),
-        where('date', '==', date)
-      ));
-      const totalCals = snap.docs.reduce((s, d) => s + (d.data().calories || 0), 0);
+      const [foodSnap, actSnap] = await Promise.all([
+        getDocs(query(collection(db, 'artifacts', appId, 'users', user.uid, 'food_logs'), where('date', '==', date))),
+        getDocs(query(collection(db, 'artifacts', appId, 'users', user.uid, 'activity_logs'), where('date', '==', date))),
+      ]);
+      const totalCals = foodSnap.docs.reduce((s, d) => s + (d.data().calories || 0), 0);
       const bmr = profile.weight
         ? (10 * profile.weight) + (6.25 * profile.height) - (5 * profile.age) + (profile.gender === 'Uomo' ? 5 : -161)
         : 2000;
       const targetCals = Math.round(bmr * (profile.goal === 'Dimagrimento' ? 1.1 : profile.goal === 'Aumento Massa' ? 1.4 : 1.2));
-      const prompt = `Sei un nutrizionista. L'utente ha appena registrato: ${meal.name} (${meal.calories} kcal, P:${meal.protein}g, C:${meal.carbs}g, G:${meal.fat}g). Totale giornaliero: ${totalCals} kcal su ${targetCals} kcal target. Obiettivo: ${profile.goal}. Dai un commento brevissimo e amichevole (max 1 frase). Rispondi solo con la frase.`;
+      const nowTime = new Date().toTimeString().slice(0, 5);
+      const upcoming = actSnap.docs
+        .map(d => d.data())
+        .filter(a => !a.completed && a.startTime && a.startTime > nowTime)
+        .sort((a, b) => a.startTime.localeCompare(b.startTime));
+      const actContext = upcoming.length > 0
+        ? ` Attività imminenti: ${upcoming.map(a => `${a.name} alle ${a.startTime}`).join(', ')}.`
+        : '';
+      const prompt = `Sei un nutrizionista e personal trainer. L'utente ha appena registrato: ${meal.name} (${meal.calories} kcal, P:${meal.protein}g, C:${meal.carbs}g, G:${meal.fat}g). Totale giornaliero: ${totalCals} kcal su ${targetCals} kcal target. Obiettivo: ${profile.goal}.${actContext} Dai un commento brevissimo e amichevole considerando eventuali allenamenti imminenti (max 1 frase). Rispondi solo con la frase.`;
       const result = await callGemini(prompt, apiKey, null, false);
       if (result) setAdvisorMessage(result.trim());
     } catch (e) {

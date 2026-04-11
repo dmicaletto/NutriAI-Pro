@@ -19,7 +19,8 @@ export default function DailyView() {
   const [showInstructions, setShowInstructions] = useState(false);
   const [loadingRecipe, setLoadingRecipe] = useState(false);
   const [viewingMeal, setViewingMeal] = useState(null);
-  const [totalBurned, setTotalBurned] = useState(0);
+  const [activityData, setActivityData] = useState({ total: 0, activities: [] });
+  const handleActivityData = useCallback((data) => setActivityData(data), []);
   const [morningTip, setMorningTip] = useState(null);
   const [morningTipDismissed, setMorningTipDismissed] = useState(false);
   const [dailyAnalysis, setDailyAnalysis] = useState(null);
@@ -30,7 +31,7 @@ export default function DailyView() {
   const debounceRef = useRef(null);
 
   const bmr = profile.weight ? (10 * profile.weight) + (6.25 * profile.height) - (5 * profile.age) + (profile.gender === 'Uomo' ? 5 : -161) : 2000;
-  const targetCals = Math.round(bmr * (profile.goal === 'Dimagrimento' ? 1.1 : profile.goal === 'Aumento Massa' ? 1.4 : 1.2)) + totalBurned;
+  const targetCals = Math.round(bmr * (profile.goal === 'Dimagrimento' ? 1.1 : profile.goal === 'Aumento Massa' ? 1.4 : 1.2)) + activityData.total;
 
   useEffect(() => {
     const q = query(collection(db, 'artifacts', appId, 'users', user.uid, 'food_logs'), where("date", "==", date));
@@ -69,18 +70,22 @@ export default function DailyView() {
       setLoadingRecs(true);
       const foodProteins = logs.reduce((s, l) => s + (l.protein || 0), 0);
       const suppList = supplementsData.supplements.map(s => s.name).join(', ');
-      const prompt = `Nutrizionista. Calcola il fabbisogno giornaliero consigliato per i seguenti supplementi.
+      const activitiesCtx = activityData.activities.length > 0
+        ? activityData.activities.map(a => `${a.name}${a.startTime ? ` alle ${a.startTime}` : ''} (${a.duration} min${a.completed ? ', completata' : ', pianificata'})`).join('; ')
+        : 'nessuna';
+      const prompt = `Nutrizionista e personal trainer. Calcola il fabbisogno giornaliero consigliato per i seguenti supplementi.
 Profilo: ${profile.gender || 'Uomo'}, ${profile.age || 30} anni, ${profile.weight || 70}kg, obiettivo: ${profile.goal || 'Mantenimento'}.
-Proteine assunte dai pasti oggi: ${foodProteins}g. Calorie bruciate con attività: ${totalBurned} kcal.
+Proteine assunte dai pasti oggi: ${foodProteins}g. Attività: ${activitiesCtx}.
 Supplementi: ${suppList}.
+Considera gli orari delle attività per raccomandare timing e dosaggi (es. aminoacidi pre-workout).
 Rispondi SOLO con JSON valido: { "recommendations": [{ "name": "...", "recommended": numero, "unit": "...", "status": "ok" }] }
-status deve essere "ok", "low" o "high" rispetto all'assunzione attuale di ciascun supplemento.`;
+status è "ok", "low" o "high" rispetto all'assunzione attuale.`;
       const result = await callGemini(prompt, apiKey, null, true);
       if (result?.recommendations) setSupplementRecs(result.recommendations);
       setLoadingRecs(false);
     }, 5000);
     return () => { if (debounceRef.current) clearTimeout(debounceRef.current); };
-  }, [logs, totalBurned, supplementsData, apiKey]);
+  }, [logs, activityData, supplementsData, apiKey]);
 
   const handleSupplementData = useCallback((data) => setSupplementsData(data), []);
 
@@ -270,7 +275,7 @@ status deve essere "ok", "low" o "high" rispetto all'assunzione attuale di ciasc
         )}
       </div>
 
-      <ActivitySection date={date} onBurnedUpdate={setTotalBurned} />
+      <ActivitySection date={date} onActivitiesUpdate={handleActivityData} />
 
       <SupplementCheckin date={date} onDataChange={handleSupplementData} />
 
