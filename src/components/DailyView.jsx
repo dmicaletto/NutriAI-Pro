@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { collection, query, where, onSnapshot, addDoc, deleteDoc, doc, getDocs } from 'firebase/firestore';
 import { Plus, X, ChevronLeft, Loader2, ChefHat, Sparkles, Brain } from 'lucide-react';
 import { db, appId } from '../firebase';
@@ -24,6 +24,10 @@ export default function DailyView() {
   const [morningTipDismissed, setMorningTipDismissed] = useState(false);
   const [dailyAnalysis, setDailyAnalysis] = useState(null);
   const [loadingAnalysis, setLoadingAnalysis] = useState(false);
+  const [supplementsData, setSupplementsData] = useState({ supplements: [], taken: {} });
+  const [supplementRecs, setSupplementRecs] = useState([]);
+  const [loadingRecs, setLoadingRecs] = useState(false);
+  const debounceRef = useRef(null);
 
   const bmr = profile.weight ? (10 * profile.weight) + (6.25 * profile.height) - (5 * profile.age) + (profile.gender === 'Uomo' ? 5 : -161) : 2000;
   const targetCals = Math.round(bmr * (profile.goal === 'Dimagrimento' ? 1.1 : profile.goal === 'Aumento Massa' ? 1.4 : 1.2)) + totalBurned;
@@ -57,6 +61,28 @@ export default function DailyView() {
       })
       .catch(e => console.error('Morning tip error:', e));
   }, [user, apiKey]);
+
+  useEffect(() => {
+    if (!apiKey || supplementsData.supplements.length === 0) return;
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+    debounceRef.current = setTimeout(async () => {
+      setLoadingRecs(true);
+      const foodProteins = logs.reduce((s, l) => s + (l.protein || 0), 0);
+      const suppList = supplementsData.supplements.map(s => s.name).join(', ');
+      const prompt = `Nutrizionista. Calcola il fabbisogno giornaliero consigliato per i seguenti supplementi.
+Profilo: ${profile.gender || 'Uomo'}, ${profile.age || 30} anni, ${profile.weight || 70}kg, obiettivo: ${profile.goal || 'Mantenimento'}.
+Proteine assunte dai pasti oggi: ${foodProteins}g. Calorie bruciate con attività: ${totalBurned} kcal.
+Supplementi: ${suppList}.
+Rispondi SOLO con JSON valido: { "recommendations": [{ "name": "...", "recommended": numero, "unit": "...", "status": "ok" }] }
+status deve essere "ok", "low" o "high" rispetto all'assunzione attuale di ciascun supplemento.`;
+      const result = await callGemini(prompt, apiKey, null, true);
+      if (result?.recommendations) setSupplementRecs(result.recommendations);
+      setLoadingRecs(false);
+    }, 5000);
+    return () => { if (debounceRef.current) clearTimeout(debounceRef.current); };
+  }, [logs, totalBurned, supplementsData, apiKey]);
+
+  const handleSupplementData = useCallback((data) => setSupplementsData(data), []);
 
   const analyzeDay = async () => {
     if (!apiKey || loadingAnalysis) return;
@@ -125,7 +151,7 @@ export default function DailyView() {
       <div className="bg-white/95 backdrop-blur rounded-3xl p-6 shadow-xl border border-white/50">
         <div className="flex justify-between items-end mb-4">
           <div>
-            <span className="text-gray-400 text-xs font-bold tracking-wider uppercase">Calorie Oggi</span>
+            <span className="text-gray-400 text-xs font-bold tracking-wider uppercase">Il tuo bilancio</span>
             <div className="text-4xl font-bold text-gray-800">{stats.cals}</div>
             <span className="text-emerald-600 text-sm font-medium">di {targetCals} kcal</span>
           </div>
@@ -141,6 +167,35 @@ export default function DailyView() {
           <MacroPill label="Carb" val={stats.carb} total={250} color="bg-amber-500" />
           <MacroPill label="Grassi" val={stats.fat} total={70} color="bg-rose-500" />
         </div>
+        {supplementsData.supplements.length > 0 && (
+          <div className="mt-4 pt-3 border-t border-gray-100 space-y-2.5">
+            {supplementsData.supplements.map(s => {
+              const takenInfo = supplementsData.taken[s.id];
+              const takenDose = takenInfo ? (takenInfo.dose || 0) : 0;
+              const rec = supplementRecs.find(r => r.name === s.name);
+              const maxDose = rec ? rec.recommended : (s.defaultDose || 0);
+              const pct = maxDose > 0 ? Math.min((takenDose / maxDose) * 100, 100) : 0;
+              const isOver = maxDose > 0 && takenDose > maxDose;
+              const isLow = rec?.status === 'low';
+              return (
+                <div key={s.id}>
+                  <div className="flex justify-between items-center text-xs mb-1">
+                    <span className="font-bold text-gray-500">{s.name}</span>
+                    <span className={`font-bold flex items-center gap-1 ${isOver ? 'text-red-500' : isLow ? 'text-amber-500' : 'text-violet-600'}`}>
+                      {takenDose}/{maxDose > 0 ? maxDose : '—'} {s.unit}
+                      {loadingRecs && <Loader2 size={10} className="animate-spin" />}
+                    </span>
+                  </div>
+                  <div className="h-1.5 bg-gray-100 rounded-full overflow-hidden">
+                    <div className={`h-full rounded-full transition-all duration-500 ${isOver ? 'bg-red-400' : 'bg-violet-400'}`}
+                      style={{ width: `${pct}%` }} />
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+
         <div className="mt-4 pt-3 border-t border-gray-100">
           <button onClick={analyzeDay} disabled={loadingAnalysis || logs.length === 0}
             className="w-full text-xs text-gray-400 flex items-center justify-center gap-1.5 hover:text-emerald-600 transition-colors disabled:opacity-40 font-medium">
@@ -217,7 +272,7 @@ export default function DailyView() {
 
       <ActivitySection date={date} onBurnedUpdate={setTotalBurned} />
 
-      <SupplementCheckin date={date} />
+      <SupplementCheckin date={date} onDataChange={handleSupplementData} />
 
       <div className="pb-20">
         <h2 className="font-bold text-white mb-3 text-lg drop-shadow-md">Pasti registrati</h2>
