@@ -6,6 +6,7 @@ import { callGemini } from '../utils/gemini';
 import { useApp } from '../context/AppContext';
 import MacroPill from './ui/MacroPill';
 import ActivitySection from './ActivitySection';
+import { PROTEIN_FACTORS } from './SupplementManager';
 import SupplementCheckin from './SupplementCheckin';
 import AdvisorToast from './AdvisorToast';
 
@@ -69,13 +70,19 @@ export default function DailyView() {
     debounceRef.current = setTimeout(async () => {
       setLoadingRecs(true);
       const foodProteins = logs.reduce((s, l) => s + (l.protein || 0), 0);
+      const protFromSuppl = supplementsData.supplements.reduce((sum, s) => {
+        const taken = supplementsData.taken[s.id];
+        if (!taken) return sum;
+        return sum + (taken.dose * (PROTEIN_FACTORS[s.type] ?? s.proteinFactor ?? 0));
+      }, 0);
+      const totalProteins = Math.round(foodProteins + protFromSuppl);
       const suppList = supplementsData.supplements.map(s => s.name).join(', ');
       const activitiesCtx = activityData.activities.length > 0
         ? activityData.activities.map(a => `${a.name}${a.startTime ? ` alle ${a.startTime}` : ''} (${a.duration} min${a.completed ? ', completata' : ', pianificata'})`).join('; ')
         : 'nessuna';
       const prompt = `Nutrizionista e personal trainer. Calcola il fabbisogno giornaliero consigliato per i seguenti supplementi.
 Profilo: ${profile.gender || 'Uomo'}, ${profile.age || 30} anni, ${profile.weight || 70}kg, obiettivo: ${profile.goal || 'Mantenimento'}.
-Proteine assunte dai pasti oggi: ${foodProteins}g. Attività: ${activitiesCtx}.
+Proteine totali oggi: ${totalProteins}g (cibo: ${Math.round(foodProteins)}g, supplementi: ${Math.round(protFromSuppl)}g). Attività: ${activitiesCtx}.
 Supplementi: ${suppList}.
 Considera gli orari delle attività per raccomandare timing e dosaggi (es. aminoacidi pre-workout).
 Rispondi SOLO con JSON valido: { "recommendations": [{ "name": "...", "recommended": numero, "unit": "...", "status": "ok" }] }
@@ -167,11 +174,29 @@ status è "ok", "low" o "high" rispetto all'assunzione attuale.`;
             </svg>
           </div>
         </div>
-        <div className="grid grid-cols-3 gap-2 mt-4">
-          <MacroPill label="Prot" val={stats.prot} total={150} color="bg-blue-500" />
-          <MacroPill label="Carb" val={stats.carb} total={250} color="bg-amber-500" />
-          <MacroPill label="Grassi" val={stats.fat} total={70} color="bg-rose-500" />
-        </div>
+        {(() => {
+          const protFromSuppl = supplementsData.supplements.reduce((sum, s) => {
+            const taken = supplementsData.taken[s.id];
+            if (!taken) return sum;
+            const factor = PROTEIN_FACTORS[s.type] ?? s.proteinFactor ?? 0;
+            return sum + (taken.dose * factor);
+          }, 0);
+          const totalProt = stats.prot + Math.round(protFromSuppl);
+          return (
+            <>
+              <div className="grid grid-cols-3 gap-2 mt-4">
+                <MacroPill label="Prot" val={totalProt} total={150} color="bg-blue-500" />
+                <MacroPill label="Carb" val={stats.carb} total={250} color="bg-amber-500" />
+                <MacroPill label="Grassi" val={stats.fat} total={70} color="bg-rose-500" />
+              </div>
+              {Math.round(protFromSuppl) > 0 && (
+                <p className="text-xs text-blue-400 text-center mt-1">
+                  di cui {Math.round(protFromSuppl)}g da supplementi
+                </p>
+              )}
+            </>
+          );
+        })()}
         {supplementsData.supplements.length > 0 && (
           <div className="mt-4 pt-3 border-t border-gray-100 space-y-2.5">
             {supplementsData.supplements.map(s => {
