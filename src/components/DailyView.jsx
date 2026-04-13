@@ -68,6 +68,7 @@ export default function DailyView() {
     if (!apiKey || supplementsData.supplements.length === 0) return;
     if (debounceRef.current) clearTimeout(debounceRef.current);
     debounceRef.current = setTimeout(async () => {
+      if (loadingRecs) return;
       setLoadingRecs(true);
       const foodProteins = logs.reduce((s, l) => s + (l.protein || 0), 0);
       const protFromSuppl = supplementsData.supplements.reduce((sum, s) => {
@@ -90,9 +91,9 @@ status è "ok", "low" o "high" rispetto all'assunzione attuale.`;
       const result = await callGemini(prompt, apiKey, null, true);
       if (result?.recommendations) setSupplementRecs(result.recommendations);
       setLoadingRecs(false);
-    }, 5000);
+    }, 20000);
     return () => { if (debounceRef.current) clearTimeout(debounceRef.current); };
-  }, [logs, activityData, supplementsData, apiKey]);
+  }, [logs, activityData, supplementsData, apiKey]); // debounce 20s — non serve real-time
 
   const handleSupplementData = useCallback((data) => setSupplementsData(data), []);
 

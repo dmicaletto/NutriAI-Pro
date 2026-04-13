@@ -28,9 +28,12 @@ export async function callGemini(prompt, apiKey, imageBase64 = null, jsonMode = 
 
       if (!response.ok) {
         if (RETRYABLE_STATUSES.includes(response.status) && attempt < MAX_RETRIES) {
-          const delay = Math.pow(2, attempt) * 1000;
-          console.warn(`Gemini ${response.status} — retry ${attempt + 1}/${MAX_RETRIES} tra ${delay}ms`);
-          await sleep(delay);
+          // 429: rispetta Retry-After o usa 30s di default
+          const retryAfter = response.status === 429
+            ? (parseInt(response.headers.get('Retry-After') || '30') * 1000)
+            : Math.pow(2, attempt) * 1000;
+          console.warn(`Gemini ${response.status} — retry ${attempt + 1}/${MAX_RETRIES} tra ${retryAfter}ms`);
+          await sleep(retryAfter);
           continue;
         }
         throw new Error(`Errore API Gemini: ${response.status}`);
