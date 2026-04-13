@@ -131,7 +131,7 @@ export default function AddFood() {
           {mode === 'camera' ? (
             <div className="space-y-4">
               <div onClick={() => fileRef.current.click()} className="h-64 border-2 border-dashed border-white/60 bg-white/30 backdrop-blur rounded-3xl flex flex-col items-center justify-center cursor-pointer relative hover:bg-white/40 transition-colors shadow-sm">
-                <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={handleFile} />
+                <input ref={fileRef} type="file" accept="image/*" capture="environment" className="hidden" onChange={handleFile} />
                 {image ? <img src={`data:image/jpeg;base64,${image}`} className="absolute inset-0 w-full h-full object-cover rounded-3xl" /> : <div className="flex flex-col items-center text-white"><Camera size={48} className="mb-2 drop-shadow-md" /><span className="font-bold drop-shadow-md">Scatta Foto</span></div>}
               </div>
               <div>
